@@ -1,5 +1,14 @@
 import { label } from './time.mjs';
 const f = (n, digits = 2) => n.toLocaleString('de-AT', { maximumFractionDigits: digits, minimumFractionDigits: digits });
+export function windowExplanation(plan) {
+  if (!plan.windows.length) return '';
+  const forced = plan.trace.filter(s => s.forced);
+  const charged = total(forced, 'chargeKwh');
+  const imported = total(forced, 'importKwh');
+  return charged < 1e-8
+    ? `Keine Batterieladung in diesen Fenstern: 0,00 kWh. Der vorhandene SOC liegt bereits über dem Ziel. Der Zwangslademodus dient hier ausschließlich als Entladesperre; ${f(imported)} kWh Netzbezug versorgen die Verbraucher. Der Ziel-SOC ist in diesem Fall kein benötigter Ladezustand.`
+    : `In den Zwangsladefenstern: ${f(charged)} kWh Batterieladung (AC-seitig, einschließlich PV) und ${f(imported)} kWh Netzbezug für Batterie und Verbraucher.`;
+}
 export function markdown(report, config) {
   const lines = ['# PV- und Ladeplanung', '', report.demo ? '**DEMO – synthetische Daten, keine reale Ladeempfehlung.**' : '**Prototyp – manuell zu prüfende Empfehlung, keine Gerätesteuerung.**', '',
     `Erstellt: ${label(Date.parse(report.generatedAt), config.timeZone)}. Horizont: ${label(report.start, config.timeZone)} bis ${label(report.end, config.timeZone)}.`, '',
@@ -27,7 +36,7 @@ export function markdown(report, config) {
       for (const w of p.windows) lines.push(`| ${label(w.start, config.timeZone)} | ${label(w.end, config.timeZone)} | ${w.targetSoc} % |`);
       lines.push('');
     }
-    lines.push(p.method, '');
+    lines.push(windowExplanation(p), '', p.method, '');
   }
   return lines.join('\n');
 }
@@ -84,7 +93,7 @@ export function html(report, config) {
     const p=s.plan,t=p.trace;
     const windows = p.windows.length ? `<table><thead><tr><th>Beginn</th><th>Ende</th><th>Ziel-SOC</th></tr></thead><tbody>${p.windows.map(w=>`<tr><td>${label(w.start,config.timeZone)}</td><td>${label(w.end,config.timeZone)}</td><td><b>${w.targetSoc} %</b></td></tr>`).join('')}</tbody></table>` : '<div class="positive">Keine Zwangsladung vorgeschlagen.</div>';
     return `<section id="scenario-${i}"><div class="sectionhead"><span class="eyebrow">VARIANTE ${i+1}</span><h2>${escape(s.name)}</h2></div>
-      <div class="columns"><div><h3>Vorgeschlagene Batteriefenster</h3>${windows}<p class="muted">Während des gesamten Fensters bleibt die Batterieentladung im Modell gesperrt – auch nach Erreichen des Ziel-SOC.</p>
+      <div class="columns"><div><h3>Vorgeschlagene Batteriefenster</h3>${windows}<p class="notice">${escape(windowExplanation(p))}</p><p class="muted">Während des gesamten Fensters bleibt die Batterieentladung im Modell gesperrt – auch nach Erreichen des Ziel-SOC.</p>
       <h3>Verbraucher im Tagesplan</h3><dl><dt>Zoe</dt><dd>${schedule(t,'zoeKwh',config.timeZone)}</dd><dt>Zusätzliche Wäsche</dt><dd>${schedule(t,'laundryKwh',config.timeZone)}</dd><dt>Legionellenprogramm</dt><dd>${schedule(t,'legionellaKwh',config.timeZone)}</dd></dl><p class="muted">Anzeige auf Viertelstunden gerundet; die Energierechnung berücksichtigt Zoe-Fenster minutengenau. Wäsche ist ein Vorschlag zur manuellen Durchführung. Das ganze Zoe-Timerfenster bleibt für Wäsche gesperrt, auch bei prognostiziert früherem Ladeende.</p></div>
       <div><h3>Energie und Kosten</h3><table><tbody>${[
         ['Hausprofil',`${f(total(t,'baseKwh'))} kWh`],['Zoe zusätzlich',`${f(total(t,'zoeKwh'))} kWh`],['Zusätzliche Wäsche',`${f(total(t,'laundryKwh'))} kWh`],

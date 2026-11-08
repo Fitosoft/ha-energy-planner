@@ -160,3 +160,13 @@ test('HA websocket reads preferences after authentication and sanitizes rejectio
   class Denied extends Socket {send(){queueMicrotask(()=>this.emit({type:'auth_invalid',message:'test-token'}));}}
   await assert.rejects(energyPreferences('http://example.com','test-token',Denied),/^Error: HA-Zugang für Energiekonfiguration abgelehnt$/);
 });
+
+test('report distinguishes discharge blocking from actual battery charging', async () => {
+  const {windowExplanation}=await import('../src/report.mjs');
+  const windows=[{start:0,end:STEP,targetSoc:10}];
+  const p={...simulate([slot(0)],b,50,windows,0,true),windows};
+  assert.match(windowExplanation(p),/Keine Batterieladung/);
+  assert.match(windowExplanation(p),/1,00 kWh Netzbezug/);
+  const q={...simulate([slot(0)],b,0,windows,0,true),windows};
+  assert.match(windowExplanation(q),/Batterieladung.*AC-seitig/);
+});
