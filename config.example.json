@@ -150,5 +150,9 @@
     "Batterie: 16 kWh nominal, 10 kW Grenzen und je 95 % Wirkungsgrad vorläufig.",
     "Zoe: 1,45 kW kalibriert; 40 kWh Kapazität und 85 % Ladewirkungsgrad geschätzt.",
     "Legionellenenergie und Wochenendprofile noch nicht sauber vom normalen Hausverbrauch getrennt."
-  ]
+  ],
+  "forecastSolar": {
+    "configEntry": null,
+    "dailyEntity": null
+  }
 }

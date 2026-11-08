@@ -79,7 +79,7 @@ berücksichtigen. Fehlender Ladestatus ist keine Freigabe. Betrachtung: letzte
 Tagesgruppe/Stunde, sonst vorherigen Wert mit Warnung behalten. Einmal wöchentlich
 ist vorgesehen; die Zeitsteuerung und automatische Klassifizierung sind noch offen.
 
-Die HA-App sichert Ist-Historien, prüft abgeschlossene Prognosen und zieht die Profile wöchentlich konservativ nach. Offen bleiben die Kalibrierung der Wäsche-Szenarien und die Zuordnung einer Forecast.Solar-Quelle.
+Die HA-App sichert Ist-Historien, prüft abgeschlossene Prognosen und zieht die Profile wöchentlich konservativ nach. Offen bleibt die Kalibrierung der Modellparameter, siehe [Kalibrierung](calibration.md). Forecast.Solar kann mit der bestehenden HA-Konfiguration zugeordnet werden.
 Die Datenformate und Eingabesnapshots erlauben diese Erweiterungen ohne Gerätesteuerung.
 
 ## Wäschevarianten und Bericht

@@ -58,6 +58,8 @@ Geeignet sind nur vollständige Messstunden mit explizit ausgeschaltetem Zoe-Lad
 
 Die sechs Alexa-Entitäten und der Handy-Dienst lassen sich in den App-Optionen ändern. Nach Änderungen die App neu starten. Der Berichtslink wird aus der eigenen App-ID abgeleitet und kann mit `report_url` überschrieben werden.
 
-Forecast.Solar wird parallel gespeichert, sobald `entities.forecastSolar` auf die eingerichtete HA-Prognoseentität zeigt. Ohne diese Quelle bleibt im Bericht eine Warnung; es wird keine zweite Prognose erfunden. Solcast nutzt unverändert die einzelne vereinfachte Modellanlage.
+Forecast.Solar wird über die vorhandene HA-Aktion forecast_solar.get_forecast aus dem HA-Cache gelesen, sobald forecastSolar.configEntry und forecastSolar.dailyEntity (der kWh-Sensor für morgen) zugeordnet sind. Die gesamte native Zeitreihe und der Tageswert werden archiviert. Es wird keine zusätzliche Forecast.Solar-API-Abfrage ausgelöst. Der Bericht vergleicht den vollständigen Folgetag mit Solcast P10/P50/P90; die Ladeplanung verwendet weiterhin P50. Nach Tagesende wird der Quellenvergleich gegen den gemessenen PV-Ertrag geprüft. Ohne vollständige Tagesmessung bleibt die Tagesabweichung unbekannt. Der alte einzelne Entitäts-Snapshot über entities.forecastSolar bleibt als Alternative unterstützt. Ohne Quelle bleibt im Bericht eine Warnung. Solcast nutzt unverändert die einzelne vereinfachte Modellanlage.
 
 Lade-/Entladewirkungsgrade, Batteriegrenzen und Waschenergie sind teilweise noch Annahmen. Die Fenstersuche ist heuristisch. Eine Prognoseprüfung verbessert diese Grundlagen; eine automatische Gerätesteuerung ist ausdrücklich nicht Teil dieser Version.
+
+Details zu den vorläufigen Parametern: [Kalibrierung](docs/calibration.md).

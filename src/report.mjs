@@ -19,6 +19,7 @@ export function markdown(report, config) {
     '- PV versorgt im Modell zunächst die Hauslast; Zwangsladung sperrt Batterieentladung während des gesamten Fensters.',
     '- Zoe-Ladung endet modelliert bei 100 % oder Fensterende. 80 % wären nur mit manuellem Abstecken erreichbar.',
     '- Verbrauchertrennung am gemeinsamen Stromkreis ist eine Planungsregel, keine technische Verriegelung.', ''];
+  if(report.pvComparison){lines.push('## PV-Prognosen für '+report.pvComparison.date,'','| Quelle | Tagesertrag |','|---|---:|',...report.pvComparison.sources.map(s=>`| ${s.name} | ${s.kwh===null?'nicht verfügbar':f(s.kwh)+' kWh'} |`),'',report.pvComparison.note,'');}
   for (const scenario of report.scenarios) {
     lines.push(`## ${scenario.name}`, '');
     if (scenario.error) { lines.push(`Nicht berechnet: ${scenario.error}`, ''); continue; }
@@ -82,6 +83,8 @@ export function html(report, config) {
   const first = valid[0]?.plan.trace ?? [];
   const rates = first.map(s=>s.price);
   const range = rates.length ? `${f(Math.min(...rates)*100,1)}–${f(Math.max(...rates)*100,1)} ct/kWh` : 'Nicht verfügbar';
+  const comparison=report.pvComparison;
+  const pvTable=comparison?`<section><h2>PV-Prognosen für ${escape(comparison.date)}</h2><table><thead><tr><th>Quelle</th><th>Tagesertrag</th></tr></thead><tbody>${comparison.sources.map(s=>`<tr><td>${escape(s.name)}</td><td>${s.kwh===null?'Nicht verfügbar':f(s.kwh)+' kWh'}</td></tr>`).join('')}</tbody></table><p class="muted">${escape(comparison.note)}</p></section>`:'';
   const choices = report.scenarios.map((s,i) => `<a class="choice ${i===preferredIndex?'selected':''}" href="#scenario-${i}">
     <span class="eyebrow">VARIANTE ${i+1}${i===preferredIndex?' · VORWAHL':''}</span>
     <h3>${s.withZoe?'Zoe laden':'Zoe nicht laden'}</h3><p>${s.withLaundry?'Mit zwei zusätzlichen Waschladungen':'Ohne zusätzliche Wäsche'}</p>
@@ -111,6 +114,6 @@ export function html(report, config) {
   <div class="metrics"><div class="metric"><strong>${f(report.initialSoc??0,0)} %</strong><span>Batterie beim Planungsstart</span></div><div class="metric"><strong>${f(total(first,'pvKwh'))} kWh</strong><span>PV im Planungshorizont</span></div><div class="metric"><strong>${range}</strong><span>Bezugspreis inkl. Aufschläge</span></div><div class="metric"><strong>${f(report.exportTariff.eurPerKwh*100,2)} ct</strong><span>Einspeisevergütung je kWh</span></div></div></header>
   <div class="intro"><h2>Vier Varianten auf einen Blick</h2><p>Die Vorwahl folgt dem aktuellen Ansteckzustand des Zoe${report.defaultZoe===null?' – dieser ist derzeit unbekannt':''}. Wähle zusätzlich, ob zwei weitere Waschladungen geplant sind.</p><p class="muted">Negative Beträge bedeuten: Einspeiseerlöse übersteigen Bezugskosten und modellierten Verschleiß. Unterschiedliche Endfüllstände sind nicht eingepreist. Jede Einsparung vergleicht dieselben Verbraucher mit und ohne Zwangsladung. Weniger Wäsche oder weniger Fahrzeugladung ist keine Optimierungseinsparung.</p></div>
   <div class="choices">${choices}</div><div class="notice">${selected?`Vorwahl: <b>${escape(preferred.name)}</b>. ${selected.windows.length?`${selected.windows.length} vorgeschlagene Batteriefenster`:'Keine Zwangsladung vorgeschlagen'}. `:''}Empfehlungsbetrieb: Geräte werden nicht geschaltet. Zwei zusätzliche Waschladungen sind eine ausdrücklich geschätzte Mehrverbrauchsvariante. Kleine Modellvorteile können durch Prognose- und Wirkungsgradfehler verschwinden.</div>
-  ${sections}<section><h2>Annahmen und Datenqualität</h2><ul>${report.warnings.map(w=>`<li>${escape(w)}</li>`).join('')}<li>Einspeisetarif: ${escape(report.exportTariff.source)}.</li><li>Der Endfüllstand wird gezeigt, aber nicht mit einem unbekannten zukünftigen Strompreis bewertet.</li><li>Zoe, Wäsche und Legionellenprogramm werden zeitlich getrennt. Das ersetzt keine technische Verriegelung des gemeinsamen Stromkreises.</li><li>Bei PV-Überschuss versorgt PV im Modell zuerst das Haus. Während Zwangsladung wird die Batterie nicht entladen.</li></ul></section>
+  ${pvTable}${sections}<section><h2>Annahmen und Datenqualität</h2><ul>${report.warnings.map(w=>`<li>${escape(w)}</li>`).join('')}<li>Einspeisetarif: ${escape(report.exportTariff.source)}.</li><li>Der Endfüllstand wird gezeigt, aber nicht mit einem unbekannten zukünftigen Strompreis bewertet.</li><li>Zoe, Wäsche und Legionellenprogramm werden zeitlich getrennt. Das ersetzt keine technische Verriegelung des gemeinsamen Stromkreises.</li><li>Bei PV-Überschuss versorgt PV im Modell zuerst das Haus. Während Zwangsladung wird die Batterie nicht entladen.</li></ul></section>
   <footer>Lokaler Bericht ohne externe Schriften, Dienste oder Tracking. Die zugehörige JSON-Datei enthält die Viertelstundenrechnung für spätere Kontrollen.</footer></main></body></html>`;
 }

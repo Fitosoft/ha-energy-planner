@@ -11,6 +11,7 @@ import { eligibleHours } from '../src/learning.mjs';
 import { demo } from '../examples/demo.mjs';
 import { plan } from '../src/cli.mjs';
 import * as render from '../src/report.mjs';
+import { solarComparison } from '../src/solar-comparison.mjs';
 
 test('HA proxy REST queries and websocket path are correct', async()=>{
   assert.equal(apiUrl('http://supervisor/core','history/period/DATE?no_attributes').href,'http://supervisor/core/api/history/period/DATE?no_attributes');
@@ -95,6 +96,7 @@ test('web UI requires CSRF, exposes no secrets and serves only allowlisted archi
 test('complete service run archives four variants, publishes success and notifies after saving',async()=>{
   const dir=await testDirectory('e2e-');const{config}=demo();
   config.entities=JSON.parse(await readFile('config.example.json','utf8')).entities;
+  config.forecastSolar={configEntry:'test-entry',dailyEntity:'sensor.fs_tomorrow'};
   await atomicJson(join(dir,'options.json'),{planner_json:JSON.stringify(config),solcast_resource_id:'test-site',solcast_api_key:'test-key'});
   const originalFetch=globalThis.fetch, originalWS=globalThis.WebSocket;
   const originalEnv={HA_URL:process.env.HA_URL,HA_TOKEN:process.env.HA_TOKEN,SOLCAST_API_KEY:process.env.SOLCAST_API_KEY,SOLCAST_RESOURCE_ID:process.env.SOLCAST_RESOURCE_ID};
@@ -113,7 +115,9 @@ test('complete service run archives four variants, publishes success and notifie
     else if(u.hostname==='api.solcast.com.au')data={forecasts:Array.from({length:144},(_,i)=>({period_end:new Date(hour+(i+1)*1800000).toISOString(),period:'PT30M',pv_estimate:0}))};
     else if(u.pathname.startsWith('/api/states/')){
       const id=decodeURIComponent(u.pathname.split('/').at(-1));
-      data={entity_id:id,state:id===config.entities.batterySoc?'50':id===config.entities.zoeSoc?'84':id===config.entities.zoeActivity?new Date().toISOString():id===config.entities.zoePlug?'off':'unplugged',last_updated:new Date().toISOString(),attributes:{}};
+      data={entity_id:id,state:id==='sensor.fs_tomorrow'?'41.411':id===config.entities.batterySoc?'50':id===config.entities.zoeSoc?'84':id===config.entities.zoeActivity?new Date().toISOString():id===config.entities.zoePlug?'off':'unplugged',last_updated:new Date().toISOString(),attributes:id==='sensor.fs_tomorrow'?{unit_of_measurement:'kWh'}:{}};
+    }else if(u.pathname==='/api/services/forecast_solar/get_forecast'){
+      data={service_response:{watts:{},wh_period:{}}};
     }else if(u.pathname.startsWith('/api/services/')){
       assert.ok((await json(join(dir,'state.json'))).latest,'run must be committed before notification');calls.push(u.pathname);data=[];
     }else throw Error('Unexpected request');
@@ -124,10 +128,31 @@ test('complete service run archives four variants, publishes success and notifie
     service=await startService(dir,{port:0,host:'127.0.0.1',ingressOnly:false,timers:false});
     const id=await service.run(true);
     const report=await json(join(dir,'runs',id,'plan.json'));assert.equal(report.scenarios.length,4);assert.ok(report.scenarios.every(s=>s.plan));
+    assert.equal(report.pvComparison.sources.at(-1).kwh,41.411);
     const state=await json(join(dir,'state.json'));assert.equal(state.status,'success');assert.equal(state.notification.mobile,'sent');assert.equal(calls.length,2);
     assert.ok(!(await readFile(join(dir,'runs',id,'input.json'),'utf8')).includes('test-key'));
   }finally{
     if(service)await service.close();globalThis.fetch=originalFetch;globalThis.WebSocket=originalWS;
     for(const[k,v]of Object.entries(originalEnv))if(v===undefined)delete process.env[k];else process.env[k]=v;
   }
+});
+test('solar sources compare the same full local day; absent quantiles stay absent',()=>{
+  const{config,snapshot}=demo();
+  snapshot.solar.forecasts=snapshot.solar.forecasts.map(r=>({...r,pv_estimate:1,pv_estimate10:.5,pv_estimate90:2}));
+  snapshot.forecastSolar={daily:{date:snapshot.targetDate,kwh:21}};
+  const c=solarComparison(config,snapshot);
+  assert.deepEqual(c.sources.map(s=>s.kwh),[12,24,48,21]);
+  delete snapshot.solar.forecasts[0].pv_estimate90;
+  assert.equal(solarComparison(config,snapshot).sources[2].kwh,null);
+  snapshot.forecastSolar.daily.date='2026-11-08';
+  assert.equal(solarComparison(config,snapshot).sources[3].kwh,null);
+});
+test('PV source errors require a complete observed day',()=>{
+  const{config,snapshot}=demo();snapshot.forecastSolar={daily:{date:snapshot.targetDate,kwh:21}};
+  const c=solarComparison(config,snapshot);
+  const rows=Array.from({length:(c.end-c.start)/300000},(_,i)=>({start:c.start+i*300000,end:c.start+(i+1)*300000,mean:1000}));
+  const report={pvComparison:c,scenarios:[]};
+  const v=validateForecast(report,{pv:rows},{pvPower:'pv'});
+  assert.equal(v.pvSources.actualKwh,24);assert.equal(v.pvSources.sources.at(-1).errorKwh,3);
+  rows.pop();assert.equal(validateForecast(report,{pv:rows},{pvPower:'pv'}).pvSources.actualKwh,null);
 });

@@ -1,4 +1,4 @@
-import { apiUrl } from './ha.mjs';
+import { apiUrl, haRequest } from './ha.mjs';
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { awattar, fresh, number, plugDefault, timestamp } from './inputs.mjs';
@@ -57,7 +57,17 @@ export async function collect(config, now = Date.now()) {
   }
   // Forecast.Solar is archived only. No substitution for missing Solcast data.
   let forecastSolar = null;
-  if (ids.forecastSolar) {
+  if (config.forecastSolar?.configEntry) {
+    try {
+      const result = await haRequest('services/forecast_solar/get_forecast?return_response', {
+        config_entry: config.forecastSolar.configEntry, resolution: 'raw'
+      });
+      const daily = await state(config.forecastSolar.dailyEntity);
+      if (!result.service_response?.wh_period || daily.attributes?.unit_of_measurement !== 'kWh' || !daily.state?.trim()) throw Error('Forecast.Solar-Daten fehlen');
+      forecastSolar = { fetchedAt:new Date(now).toISOString(), source:'Home Assistant Forecast.Solar (vorhandener Cache)',
+        resolution:'raw', data:result.service_response, daily:{date:targetDate,kwh:number(Number(daily.state),'Forecast.Solar Tagesenergie',0)}, dailyState:daily };
+    } catch { warnings.push('Forecast.Solar konnte nicht vollständig aus HA gelesen werden; kein Ersatz durch Nullwerte.'); }
+  } else if (ids.forecastSolar) {
     try { forecastSolar = await state(ids.forecastSolar); }
     catch { warnings.push('Forecast.Solar konnte für das parallele Logging nicht gelesen werden.'); }
   } else warnings.push('Forecast.Solar-Logging vorbereitet; noch keine Entität eingerichtet/zugeordnet.');

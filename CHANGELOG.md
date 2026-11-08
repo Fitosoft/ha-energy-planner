@@ -1,3 +1,9 @@
+# 0.2.1
+
+- Vollständige vorhandene Forecast.Solar-Zeitreihe über die HA-Aktion lesen und getrennt archivieren.
+- Tagesvergleich mit Solcast P10/P50/P90 im Bericht und später gegen gemessenen Ertrag.
+- Fehlende Quellen bleiben ausdrücklich fehlend; die Ladeplanung verwendet weiterhin Solcast P50.
+
 # 0.2.0
 
 - Installierbare HA-App für Raspberry Pi 5 (aarch64) und amd64.

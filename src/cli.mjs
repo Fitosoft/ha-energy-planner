@@ -6,6 +6,7 @@ import { makeSlots, recommend } from './model.mjs';
 import { collect } from './sources.mjs';
 import { markdown, html } from './report.mjs';
 import { refreshProfiles } from './profiles.mjs';
+import { solarComparison } from './solar-comparison.mjs';
 
 export function plan(config, snapshot, demo = false) {
   config = { ...config, exportEurPerKwh: snapshot.exportTariff?.eurPerKwh ?? config.exportEurPerKwh };
@@ -17,7 +18,7 @@ export function plan(config, snapshot, demo = false) {
   const pv = resample(solcast(snapshot.solar), snapshot.start, snapshot.end, 'PV');
   const report = { demo, generatedAt: snapshot.generatedAt, start: snapshot.start, end: snapshot.end,
     defaultZoe: snapshot.defaultZoe, initialSoc: snapshot.initialSoc, exportTariff: snapshot.exportTariff ?? { eurPerKwh: config.exportEurPerKwh, source: 'Beispielkonfiguration' },
-    warnings: [...(snapshot.warnings ?? []), ...(config.assumptions ?? [])], scenarios: [] };
+    warnings: [...(snapshot.warnings ?? []), ...(config.assumptions ?? [])], scenarios: [], pvComparison:solarComparison(config,snapshot) };
   for (const withZoe of [false, true]) for (const withLaundry of [false, true]) {
     const name = `${withZoe ? 'Mit' : 'Ohne'} Zoe · ${withLaundry ? 'zwei zusätzliche Waschladungen' : 'ohne zusätzliche Wäsche'}`;
     try {
