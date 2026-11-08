@@ -1,0 +1,39 @@
+{
+  "timeZone": "Europe/Vienna",
+  "entities": {
+    "batterySoc": "sensor.sungrow_battery_level",
+    "zoeSoc": "sensor.zoe_batterie",
+    "zoePlug": "binary_sensor.zoe_stecker",
+    "zoePlugText": "sensor.zoe_steckerzustand",
+    "zoeActivity": "sensor.letzte_batterieaktivitat",
+    "market": "sensor.awattar_marketdata_raw",
+    "forecastSolar": null
+  },
+  "tariff": { "confirmed": false, "marketMultiplier": 1.2, "fixedEurPerKwh": 0.1196 },
+  "exportEurPerKwh": 0,
+  "battery": {
+    "capacityKwh": 16, "minSoc": 0, "maxSoc": 100,
+    "chargeKw": 10, "dischargeKw": 10,
+    "chargeEfficiency": 0.95, "dischargeEfficiency": 0.95, "wearEurPerKwh": 0
+  },
+  "profiles": {
+    "weekday": [0.8,0.8,0.7,0.6,0.6,0.7,1,1,0.8,1,1,1.2,1.2,1.3,1,0.9,1.1,1.5,1.4,1,1,1,1,0.9],
+    "saturday": [0.8,0.8,0.7,0.6,0.6,0.7,1,1,0.8,1,1,1.2,1.2,1.3,1,0.9,1.1,1.5,1.4,1,1,1,1,0.9],
+    "sunday": [0.8,0.8,0.7,0.6,0.6,0.7,1,1,0.8,1,1,1.2,1.2,1.3,1,0.9,1.1,1.5,1.4,1,1,1,1,0.9]
+  },
+  "zoe": {
+    "powerKw": 1.45, "capacityKwh": 40, "chargeEfficiency": 0.85,
+    "normalWindows": [["08:15", "16:05"]],
+    "legionellaWindows": [["08:15", "11:30"], ["15:30", "16:05"]]
+  },
+  "legionella": { "weekday": 0, "start": "12:00", "end": "14:30", "extraKwh": 4.5 },
+  "laundry": { "enabled": false, "windows": [], "powerKw": null },
+  "assumptions": [
+    "Beispielprofil; durch lokal kalibriertes Profil ersetzen.",
+    "Preisformel ist nur aus einem Screenshot abgeleitet und nicht bestätigt.",
+    "Einspeisewert 0 EUR/kWh ist ein Platzhalter, kein bestätigter Vertragspreis.",
+    "Batterie: 16 kWh nominal, 10 kW Grenzen und je 95 % Wirkungsgrad vorläufig.",
+    "Zoe: 1,45 kW kalibriert; 40 kWh Kapazität und 85 % Ladewirkungsgrad geschätzt.",
+    "Legionellenenergie und Wochenendprofile noch nicht sauber vom normalen Hausverbrauch getrennt."
+  ]
+}
