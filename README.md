@@ -16,14 +16,14 @@ node src/cli.mjs demo
 
 Der Demo-Bericht wird in `output/` gespeichert. Für reale Eingaben siehe
 [Inbetriebnahme und Modellgrenzen](docs/home-assistant.md). Die erste Version hat
-Preis-/PV-Adapter, Datenlückenprüfung, Batteriesimulation, zwei Zoe-Varianten,
-begrenzte Ladefenstersuche und Markdown-/JSON-Ausgabe. Eine aktive HA-Automation
+Preis-/PV-Adapter, Datenlückenprüfung, Batteriesimulation, vier Kombinationen aus Zoe und zwei zusätzlichen Waschladungen,
+begrenzte Ladefenstersuche und HTML-/Markdown-/JSON-Ausgabe. Eine aktive HA-Automation
 ist noch nicht installiert. Die Suche ist heuristisch und keine globale Optimierung.
 
 ## Geplanter Ablauf
 
 Täglich um 20:00 Europe/Vienna: aktuelle Eingaben lesen, bis Ende des Folgetags
-simulieren, Ladeempfehlungen und Alternativen als Markdown/JSON ablegen.
+simulieren, Ladeempfehlungen und Alternativen als HTML/Markdown/JSON ablegen.
 Ein vorhandenes Ladefenster bleibt im Modell auch nach Erreichen des Ziel-SOC aktiv:
 die Batterie entlädt dann nicht zur Versorgung des Hauses.
 
@@ -35,6 +35,6 @@ die Batterie entlädt dann nicht zur Versorgung des Hauses.
 
 ## Noch zu verifizieren
 
-Endkundenpreisformel, nutzbare Batteriekapazität und Wirkungsgrade, tatsächliche
+Nutzbare Batteriekapazität und Wirkungsgrade, tatsächliche
 Lade-/Entladegrenzen, bereinigte Wochenendprofile und Waschmaschinen-Energie.
 Ein Demo-Ergebnis ist keine Empfehlung für eine reale Anlage.

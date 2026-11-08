@@ -4,10 +4,11 @@ import { fileURLToPath } from 'node:url';
 import { awattar, solcast, resample, fresh, number } from './inputs.mjs';
 import { makeSlots, recommend } from './model.mjs';
 import { collect } from './sources.mjs';
-import { markdown } from './report.mjs';
+import { markdown, html } from './report.mjs';
 import { refreshProfiles } from './profiles.mjs';
 
 export function plan(config, snapshot, demo = false) {
+  config = { ...config, exportEurPerKwh: snapshot.exportTariff?.eurPerKwh ?? config.exportEurPerKwh };
   const now = Date.parse(snapshot.generatedAt);
   fresh(snapshot.marketFetchedAt, now, 4, 'Preise');
   fresh(snapshot.solarFetchedAt, now, 24, 'PV-Prognose');
@@ -15,15 +16,16 @@ export function plan(config, snapshot, demo = false) {
   const prices = resample(awattar(snapshot.market, config.tariff), snapshot.start, snapshot.end, 'Strompreis');
   const pv = resample(solcast(snapshot.solar), snapshot.start, snapshot.end, 'PV');
   const report = { demo, generatedAt: snapshot.generatedAt, start: snapshot.start, end: snapshot.end,
-    defaultZoe: snapshot.defaultZoe, warnings: [...(snapshot.warnings ?? []), ...(config.assumptions ?? [])], scenarios: [] };
-  for (const withZoe of [false, true]) for (const withLaundry of config.laundry.enabled ? [false, true] : [false]) {
-    const name = `${withZoe ? 'Mit' : 'Ohne'} Zoe${withLaundry ? ' + zusätzliche Wäsche' : ''}`;
+    defaultZoe: snapshot.defaultZoe, initialSoc: snapshot.initialSoc, exportTariff: snapshot.exportTariff ?? { eurPerKwh: config.exportEurPerKwh, source: 'Beispielkonfiguration' },
+    warnings: [...(snapshot.warnings ?? []), ...(config.assumptions ?? [])], scenarios: [] };
+  for (const withZoe of [false, true]) for (const withLaundry of [false, true]) {
+    const name = `${withZoe ? 'Mit' : 'Ohne'} Zoe · ${withLaundry ? 'zwei zusätzliche Waschladungen' : 'ohne zusätzliche Wäsche'}`;
     try {
       const slots = makeSlots(config, snapshot, snapshot.start, snapshot.end, prices, pv, withZoe, withLaundry);
       report.scenarios.push({ name, withZoe, withLaundry, plan: recommend(slots, config, snapshot.initialSoc) });
-    } catch (e) { report.scenarios.push({ name, error: e.message }); }
+    } catch (e) { report.scenarios.push({ name, withZoe, withLaundry, error: e.message }); }
   }
-  if (!config.laundry.enabled) report.warnings.push('Zusatzwäsche noch nicht berechnet: Zeitfenster und zusätzliche Energie nicht kalibriert.');
+  report.warnings.push(`Wäsche-Szenario: zwei zusätzliche Ladungen, je ${config.laundry.cycleKwh ?? '?'} kWh und ${config.laundry.durationMinutes ?? '?'} Minuten. Vorläufige Annahme, nicht gemessen; bereits im Grundprofil enthaltene Wäsche bleibt enthalten.`);
   return report;
 }
 async function main() {
@@ -53,10 +55,11 @@ async function main() {
   await writeFile(`${prefix}-input.json`, JSON.stringify(snapshot, null, 2));
   if (command === 'collect') { console.log(`Eingaben gespeichert: ${prefix}-input.json`); return; }
   const report = plan(config, snapshot, command === 'demo');
-  await writeFile(`${prefix}-config.json`, JSON.stringify(config, null, 2));
+  await writeFile(`${prefix}-config.json`, JSON.stringify({ ...config, exportEurPerKwh: report.exportTariff.eurPerKwh }, null, 2));
   await writeFile(`${prefix}-plan.json`, JSON.stringify(report, null, 2));
   await writeFile(`${prefix}-bericht.md`, markdown(report, config));
-  console.log(`Bericht: ${prefix}-bericht.md`);
+  await writeFile(`${prefix}-bericht.html`, html(report, config));
+  console.log(`Bericht: ${prefix}-bericht.html`);
   if (report.scenarios.some(s => s.error)) process.exitCode = 2;
 }
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

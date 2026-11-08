@@ -6,7 +6,7 @@ export function demo() {
     profiles: { weekday: Array(24).fill(0.8), saturday: Array(24).fill(0.8), sunday: Array(24).fill(0.8) },
     zoe: { powerKw: 1.45, capacityKwh: 40, chargeEfficiency: 0.85, normalWindows: [['08:15','16:05']], legionellaWindows: [['08:15','11:30'],['15:30','16:05']] },
     legionella: { weekday: 0, start: '12:00', end: '14:30', extraKwh: 4.5 },
-    laundry: { enabled: false, windows: [], powerKw: null },
+    laundry: { cycles: 2, cycleKwh: 1, durationMinutes: 120, earliest: '09:00', latest: '21:00' },
     assumptions: ['Synthetisches Verbrauchsprofil und künstliche Preise.', 'Wirkungsgrade und Leistungsgrenzen sind Beispielannahmen.']
   };
   const snapshot = { generatedAt: new Date(start).toISOString(), marketFetchedAt: new Date(start).toISOString(), solarFetchedAt: new Date(start).toISOString(),

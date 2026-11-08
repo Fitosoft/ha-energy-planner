@@ -41,13 +41,13 @@ export function makeSlots(config, snapshot, start, end, prices, pv, withZoe, wit
     if (programEnd <= programStart) throw Error('Ungültiges Legionellenfenster');
     const legionellaKwh = legionella ? number(config.legionella.extraKwh, 'Legionellenenergie', 0) * overlapMinutes(minute, minute + 15, programStart, programEnd) / (programEnd - programStart) : 0;
     const zoeMinutes = withZoe ? windowOverlap(minute, legionella ? config.zoe.legionellaWindows : config.zoe.normalWindows) : 0;
-    const laundryMinutes = withLaundry && date === snapshot.targetDate ? windowOverlap(minute, config.laundry.windows) : 0;
-    const laundryKwh = laundryMinutes ? number(config.laundry.powerKw, 'Wäscheleistung', 0) * laundryMinutes / 60 : 0;
+    const laundryKwh = 0;
     const zoeKwh = Math.min(zoeRemaining, config.zoe.powerKw * zoeMinutes / 60);
     zoeRemaining -= zoeKwh;
     // Conservative shared-circuit rule: do not combine any of the three loads.
     if ((zoeKwh > 0 && legionellaKwh > 0) || (laundryKwh > 0 && (zoeKwh > 0 || legionellaKwh > 0))) throw Error('Szenario verletzt die zeitliche Trennung am gemeinsamen Stromkreis');
     slots.push({ start: t, end: t + STEP, date, minute, baseKwh, zoeKwh, legionellaKwh, laundryKwh,
+      applianceBlocked: zoeMinutes > 0 || (legionella && windowOverlap(minute, config.legionella.blockedWindows ?? [[config.legionella.start, config.legionella.end]]) > 0),
       loadKwh: baseKwh + zoeKwh + legionellaKwh + laundryKwh,
       pvKwh: number(pv[i], 'PV kW', 0) / 4, price: number(prices[i], 'Preis EUR/kWh') });
   }
@@ -55,7 +55,26 @@ export function makeSlots(config, snapshot, start, end, prices, pv, withZoe, wit
   for (const s of slots) { const k = `${s.date}/${s.minute}`; localCounts.set(k, (localCounts.get(k) ?? 0) + 1); }
   // Device timers cannot distinguish the two occurrences of a repeated autumn hour.
   for (const s of slots) s.ambiguousClock = localCounts.get(`${s.date}/${s.minute}`) > 1;
+  if (withLaundry) scheduleLaundry(slots, config.laundry, snapshot.targetDate);
   return slots;
+}
+export function scheduleLaundry(slots, laundry, targetDate) {
+  const count = number(laundry.cycles, 'Anzahl Waschladungen', 1, 10);
+  const minutes = number(laundry.durationMinutes, 'Waschdauer', 15, 720);
+  const energy = number(laundry.cycleKwh, 'Energie je Waschladung', 0.01);
+  if (!Number.isInteger(count) || minutes % 15) throw Error('Waschanzahl ganzzahlig und Waschdauer im Viertelstundenraster erforderlich');
+  const earliest = clockMinutes(laundry.earliest), latest = clockMinutes(laundry.latest);
+  const length = minutes / 15;
+  for (let cycle = 1; cycle <= count; cycle++) {
+    let found = false;
+    for (let i = 0; i + length <= slots.length; i++) {
+      const block = slots.slice(i, i + length);
+      if (block.some(s => s.date !== targetDate || s.minute < earliest || s.minute + 15 > latest || s.applianceBlocked || s.ambiguousClock || s.laundryKwh > 0)) continue;
+      for (const s of block) { s.laundryKwh = energy / length; s.loadKwh += s.laundryKwh; s.laundryCycle = cycle; }
+      found = true; break;
+    }
+    if (!found) throw Error('Kein vollständiges, konfliktfreies Zeitfenster für beide Waschladungen vorhanden');
+  }
 }
 export function simulate(slots, battery, initialSoc, windows = [], exportPrice = 0, detail = false) {
   let stored = battery.capacityKwh * initialSoc / 100;

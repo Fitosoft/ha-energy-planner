@@ -116,3 +116,47 @@ test('ambiguous autumn clock hours are not proposed as device timer windows', ()
   const repeated = slots.find(s => s.ambiguousClock);
   assert.equal(validWindows(slots, [{ start: repeated.start, end: repeated.end, targetSoc: 50 }], b), false);
 });
+
+test('fixed export tariff reads modern and legacy Energy preferences without guessing', async () => {
+  const { exportTariffFromPreferences: read } = await import('../src/energy.mjs');
+  assert.equal(read({energy_sources:[{type:'grid',stat_energy_to:'sensor.export',number_energy_price_export:0.1836}]}).eurPerKwh,0.1836);
+  assert.equal(read({energy_sources:[{type:'grid',flow_to:[{stat_energy_to:'sensor.export',number_energy_price:0.18}]}]}).eurPerKwh,0.18);
+  assert.throws(()=>read({energy_sources:[]}),/eindeutig/);
+  assert.throws(()=>read({energy_sources:[{type:'grid',stat_energy_to:'sensor.export',number_energy_price_export:null}]}),/Ungültiger/);
+});
+test('laundry adds exactly two cycles and reserves full Zoe timer despite full SOC', () => {
+  const {config,snapshot}=demo(); snapshot.zoeSoc=100;
+  const start=midnight(snapshot.targetDate), end=midnight(nextDate(snapshot.targetDate));
+  const n=(end-start)/STEP;
+  const slots=makeSlots(config,snapshot,start,end,Array(n).fill(.3),Array(n).fill(0),true,true);
+  const washing=slots.filter(s=>s.laundryKwh>0);
+  assert.equal(washing.length,16);
+  assert.equal(washing.reduce((sum,s)=>sum+s.laundryKwh,0),2);
+  assert.ok(washing.every(s=>!s.applianceBlocked && s.minute>=16*60+15));
+  config.laundry.latest='18:00';
+  assert.throws(()=>makeSlots(config,snapshot,start,end,Array(n).fill(.3),Array(n).fill(0),true,true),/Kein vollständiges/);
+});
+test('four report scenarios retain their identity even when Zoe SOC is missing', async () => {
+  const {plan}=await import('../src/cli.mjs'); const {html}=await import('../src/report.mjs');
+  const {config,snapshot}=demo(); snapshot.zoeSoc=null; snapshot.warnings=['<script>unsafe</script>'];
+  const report=plan(config,snapshot,true);
+  assert.equal(report.scenarios.length,4);
+  assert.deepEqual(report.scenarios.map(s=>[s.withZoe,s.withLaundry]),[[false,false],[false,true],[true,false],[true,true]]);
+  assert.ok(report.scenarios[2].error);
+  const page=html(report,config);
+  assert.ok(page.includes('&lt;script&gt;unsafe&lt;/script&gt;'));
+  assert.ok(!page.includes('<script>unsafe</script>'));
+  assert.ok(page.includes('Netto-Stromsaldo'));
+});
+test('HA websocket reads preferences after authentication and sanitizes rejection', async () => {
+  const {energyPreferences}=await import('../src/energy.mjs');
+  class Socket extends EventTarget {
+    constructor(){ super(); queueMicrotask(()=>this.emit({type:'auth_required'})); }
+    emit(data){this.dispatchEvent(new MessageEvent('message',{data:JSON.stringify(data)}));}
+    send(raw){const m=JSON.parse(raw); queueMicrotask(()=>this.emit(m.type==='auth'?{type:'auth_ok'}:{type:'result',id:1,success:true,result:{energy_sources:[]}}));}
+    close(){}
+  }
+  assert.deepEqual(await energyPreferences('http://example.com','test-token',Socket),{energy_sources:[]});
+  class Denied extends Socket {send(){queueMicrotask(()=>this.emit({type:'auth_invalid',message:'test-token'}));}}
+  await assert.rejects(energyPreferences('http://example.com','test-token',Denied),/^Error: HA-Zugang für Energiekonfiguration abgelehnt$/);
+});

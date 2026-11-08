@@ -2,6 +2,7 @@ import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { awattar, fresh, number, plugDefault, timestamp } from './inputs.mjs';
 import { STEP, localParts, midnight, nextDate } from './time.mjs';
+import { energyPreferences, exportTariffFromPreferences } from './energy.mjs';
 
 export async function getJson(url, token, fetcher = fetch) {
   const response = await fetcher(url, { headers: { Accept: 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
@@ -18,6 +19,7 @@ export async function collect(config, now = Date.now()) {
   const base = new URL(haUrl);
   if (!['http:', 'https:'].includes(base.protocol) || base.username || base.password) throw Error('Ungültige HA_URL');
   const state = id => getJson(new URL(`/api/states/${encodeURIComponent(id)}`, base), haToken);
+  const exportTariff = exportTariffFromPreferences(await energyPreferences(base, haToken), config.exportMeter ?? null);
   const ids = config.entities;
   const [soc, zoeSoc, plug, plugText, activity, market] = await Promise.all([
     state(ids.batterySoc), state(ids.zoeSoc), state(ids.zoePlug), state(ids.zoePlugText), state(ids.zoeActivity), state(ids.market)
@@ -34,7 +36,8 @@ export async function collect(config, now = Date.now()) {
   if (defaultZoe === null) warnings.push('Ansteckzustand unbekannt, veraltet oder widersprüchlich: beide Varianten ohne Vorwahl.');
   // Explicit boundaries avoid the rolling-24-hour endpoint truncating tomorrow evening.
   const marketUrl = new URL('https://api.awattar.at/v1/marketdata');
-  marketUrl.searchParams.set('start', String(start)); marketUrl.searchParams.set('end', String(end));
+  // aWATTar filters on interval start: include the current hour for off-hour runs.
+  marketUrl.searchParams.set('start', String(Math.floor(start / 3_600_000) * 3_600_000)); marketUrl.searchParams.set('end', String(end));
   const marketData = await getJson(marketUrl);
   // Validate formula now, before consuming a Solcast request.
   awattar(marketData, config.tariff);
@@ -60,7 +63,7 @@ export async function collect(config, now = Date.now()) {
   return { generatedAt: new Date(now).toISOString(), start, end, targetDate, initialSoc,
     zoeSoc: zoeFresh && Number.isFinite(parsedZoe) ? parsedZoe : null, defaultZoe, warnings,
     marketFetchedAt: new Date(now).toISOString(), solarFetchedAt: solar.fetchedAt,
-    market: marketData, solar: solar.data, forecastSolar,
+    market: marketData, solar: solar.data, forecastSolar, exportTariff,
     sourceState: { marketLastUpdated: market.last_updated, marketRange: market.attributes?.data?.map(r => [r.start_timestamp, r.end_timestamp]),
       batteryUpdated: soc.last_updated, zoeActivity: activity.state, plug: plug.state, plugText: plugText.state } };
 }

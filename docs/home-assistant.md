@@ -9,13 +9,13 @@
 4. `.env.example` nach `local/secrets.env` kopieren und dort die Schlüssel eintragen.
    Datei nicht hochladen. Solcast-Ressource ebenfalls dort setzen.
 5. Preisformel anhand der HA-Template-Definition prüfen; erst danach
-   `tariff.confirmed` auf `true` setzen. Der abgeleitete Ansatz lautet:
+   `tariff.confirmed` auf `true` setzen. Die vom Projektbesitzer anhand seiner Templates bestätigte Formel lautet:
    `EUR/kWh = EUR/MWh / 1000 * 1.2 + 0.1196`.
    Er reproduziert den Beispielwert 0.4991 EUR/kWh, ist aber kein Vertragsnachweis.
-   Monatliche Grundgebühren gehören nicht in variable Kosten. Einspeisevergütung separat setzen.
+   Monatliche Grundgebühren gehören nicht in variable Kosten. Die feste Einspeisevergütung wird bei jedem Live-Abruf über HA energy/get_prefs aus der Energie-Konfiguration gelesen. Sie ist keine eigene Preis-Entität. Mehrere Exportzähler erfordern eine eindeutige Auswahl über exportMeter; fehlende Werte brechen den Abruf ab.
 6. `node --env-file=local/secrets.env src/cli.mjs collect` speichert Eingaben.
 7. `node --env-file=local/secrets.env src/cli.mjs plan` liest aktuelle Eingaben
-   und erzeugt einen Markdown-Bericht plus JSON mit Viertelstundenwerten.
+   und erzeugt einen gestalteten HTML-Bericht, Markdown und JSON mit Viertelstundenwerten.
    Alternativ: `node src/cli.mjs plan local/config.json output/DATE-input.json`
    für reproduzierbare Offline-Rechnungen.
 
@@ -30,7 +30,7 @@ Attributen mitgespeichert werden. Ohne eingerichtete Entität bleibt es ausdrüc
 
 Der bestehende Raw-Sensor liefert eventuell nur rollierende 24 Stunden.
 Der Planer ruft deshalb aWATTar Österreich mit explizitem `start` und `end` ab:
-aktuelle nächste Viertelstunde bis Mitternacht nach dem Folgetag. Jede Preis- und
+Beginn der aktuellen Stunde bis Mitternacht nach dem Folgetag. Die Simulation beginnt erst an der nächsten Viertelstunde; der Stundenanfang im Abruf verhindert eine Lücke beim aktuellen Stundenpreis. Jede Preis- und
 PV-Viertelstunde muss abgedeckt sein. Keine Fortschreibung des letzten Preises und
 keine Nullwerte für fehlende Daten. Der HA-Raw-Sensor wird zum Vergleich dokumentiert.
 
@@ -85,3 +85,11 @@ ist vorgesehen; die Zeitsteuerung und automatische Klassifizierung sind noch off
 Offen: automatische Historienabfrage und Aktivierung der wöchentlichen Profilaktualisierung,
 verifizierte Wäsche-Szenarien, endgültiger Berichtskanal und Prognose-Ist-Vergleich.
 Die Datenformate und Eingabesnapshots erlauben diese Erweiterungen ohne Gerätesteuerung.
+
+## Wäschevarianten und Bericht
+
+Vier Varianten kombinieren Zoe ja/nein mit zwei zusätzlichen Waschladungen ja/nein. Vorläufig werden je 1 kWh und 120 Minuten angesetzt. Wäsche, die bereits im historischen Hausprofil steckt, wird nicht nachträglich entfernt. Die Zusatzvariante ist deshalb keine bereinigte Prognose aller Waschgänge.
+
+Die zwei Waschgänge werden nacheinander in die frühesten freien Zeiträume zwischen 09 und 21 Uhr gelegt. Das vollständige Zoe-Timerfenster und die gepufferte Legionellensperre bleiben frei. Dies ist eine konfliktfreie Platzierung, noch keine Preisoptimierung der Waschzeiten.
+
+Negative Stromsalden bedeuten einen Überschuss der Einspeiseerlöse über Bezugskosten und modellierten Verschleiß. Der Batterie-Endfüllstand muss beim Vergleich mitgelesen werden: sein Restwert wird nicht monetarisiert. Kleine Rechenvorteile sind bei unkalibrierten Parametern keine belastbare Ersparnis.
