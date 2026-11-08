@@ -1,3 +1,4 @@
+import { apiUrl } from './ha.mjs';
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { awattar, fresh, number, plugDefault, timestamp } from './inputs.mjs';
@@ -18,7 +19,7 @@ export async function collect(config, now = Date.now()) {
   if (!haUrl || !haToken) throw Error('HA_URL und HA_TOKEN fehlen in der lokalen Umgebung');
   const base = new URL(haUrl);
   if (!['http:', 'https:'].includes(base.protocol) || base.username || base.password) throw Error('Ungültige HA_URL');
-  const state = id => getJson(new URL(`/api/states/${encodeURIComponent(id)}`, base), haToken);
+  const state = id => getJson(apiUrl(base, `states/${encodeURIComponent(id)}`), haToken);
   const exportTariff = exportTariffFromPreferences(await energyPreferences(base, haToken), config.exportMeter ?? null);
   const ids = config.entities;
   const [soc, zoeSoc, plug, plugText, activity, market] = await Promise.all([

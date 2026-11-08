@@ -17,8 +17,7 @@ node src/cli.mjs demo
 Der Demo-Bericht wird in `output/` gespeichert. Für reale Eingaben siehe
 [Inbetriebnahme und Modellgrenzen](docs/home-assistant.md). Die erste Version hat
 Preis-/PV-Adapter, Datenlückenprüfung, Batteriesimulation, vier Kombinationen aus Zoe und zwei zusätzlichen Waschladungen,
-begrenzte Ladefenstersuche und HTML-/Markdown-/JSON-Ausgabe. Eine aktive HA-Automation
-ist noch nicht installiert. Die Suche ist heuristisch und keine globale Optimierung.
+begrenzte Ladefenstersuche und HTML-/Markdown-/JSON-Ausgabe. Die HA-App enthält den täglichen 20-Uhr-Zeitplan, Benachrichtigungen, eine geschützte Berichtsansicht und ein Ist-Archiv; siehe [Installation und Betrieb](DOCS.md). Die Suche ist heuristisch und keine globale Optimierung.
 
 ## Geplanter Ablauf
 

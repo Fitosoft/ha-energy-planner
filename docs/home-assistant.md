@@ -60,10 +60,7 @@ keine Nullwerte für fehlende Daten. Der HA-Raw-Sensor wird zum Vergleich dokume
 
 ## Betrieb auf Home Assistant
 
-Noch nicht installiert oder zeitgesteuert. Der Pi-Betrieb muss zur tatsächlichen
-Installationsart passen (HA OS/App oder separater Dienst). Keine Änderungen am
-HA-System und keine Schaltbefehle wurden vorgenommen. Erst nach erfolgreichem
-Live-Probelauf wird ein täglicher Start um 20:00 Europe/Vienna eingerichtet.
+Seit Version 0.2.0 liegt eine installierbare HA-App mit Zeitsteuerung, Benachrichtigung, Ingress und Ist-Archiv vor. Einrichtung und Archivformate: [App-Dokumentation](../DOCS.md). Der Kommandozeilenmodus bleibt zusätzlich verfügbar.
 
 ## Profile nachziehen
 
@@ -82,8 +79,7 @@ berücksichtigen. Fehlender Ladestatus ist keine Freigabe. Betrachtung: letzte
 Tagesgruppe/Stunde, sonst vorherigen Wert mit Warnung behalten. Einmal wöchentlich
 ist vorgesehen; die Zeitsteuerung und automatische Klassifizierung sind noch offen.
 
-Offen: automatische Historienabfrage und Aktivierung der wöchentlichen Profilaktualisierung,
-verifizierte Wäsche-Szenarien, endgültiger Berichtskanal und Prognose-Ist-Vergleich.
+Die HA-App sichert Ist-Historien, prüft abgeschlossene Prognosen und zieht die Profile wöchentlich konservativ nach. Offen bleiben die Kalibrierung der Wäsche-Szenarien und die Zuordnung einer Forecast.Solar-Quelle.
 Die Datenformate und Eingabesnapshots erlauben diese Erweiterungen ohne Gerätesteuerung.
 
 ## Wäschevarianten und Bericht

@@ -124,7 +124,7 @@ export function validWindows(slots, windows, battery) {
 export function recommend(slots, config, initialSoc) {
   const b = config.battery;
   validateBattery(b); number(initialSoc, 'Hausbatterie-SOC', 0, 100);
-  const baseline = simulate(slots, b, initialSoc, [], config.exportEurPerKwh);
+  const baseline = simulate(slots, b, initialSoc, [], config.exportEurPerKwh, true);
   let windows = [], best = baseline;
   const targets = [...new Set([...Array.from({ length: 10 }, (_, i) => (i + 1) * 10), b.maxSoc])].filter(x => x >= b.minSoc && x <= b.maxSoc);
   // shortcut: greedy window insertion and 10%-SOC grid; improve only when real comparisons justify it.
