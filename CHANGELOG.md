@@ -1,3 +1,12 @@
+# 0.3.0
+
+- Frischeprüfung des Hausbatterie-SOC über den live gelesenen HA-Meldezeitpunkt. Unveränderte 0 % bleiben gültig; ungültige, alte und echte Zukunftswerte werden getrennt erkannt.
+- Aktueller Bericht wird über `/latest` aus abgeschlossenen Archivläufen ermittelt. Jeder Bericht zeigt Lauf-ID, Planungshorizont, Ablaufstatus und Bestätigungsstatus, ohne seine Archivdatei zu verändern.
+- Manueller Wiederholungsversuch mit und ohne Benachrichtigung, unabhängig vom täglichen Einmallauf.
+- Vier stabile Szenario-IDs mit ausdrücklicher, dauerhafter Planbestätigung pro Lauf.
+- Manuell eingestellte Batteriefenster werden getrennt als Nutzerangabe mit Bezug zur damaligen Planbestätigung gespeichert; keine Gerätesteuerung.
+- Änderungen an Bestätigungen und Validierungsständen bleiben als unveränderliche Historie erhalten.
+
 # 0.2.1
 
 - Vollständige vorhandene Forecast.Solar-Zeitreihe über die HA-Aktion lesen und getrennt archivieren.

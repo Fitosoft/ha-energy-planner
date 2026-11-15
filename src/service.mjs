@@ -2,16 +2,17 @@ import { appendFile, mkdir, readFile, readdir, writeFile } from 'node:fs/promise
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createServer } from 'node:http';
-import { randomBytes } from 'node:crypto';
+import { randomBytes, createHash } from 'node:crypto';
 import { collect } from './sources.mjs';
 import { plan } from './cli.mjs';
 import * as render from './report.mjs';
-import { haRequest, websocketRequest } from './ha.mjs';
+import { decisionContext, decisionPage, recordDecision, scenarioId } from './decisions.mjs';
+import { haRequest, websocketRequest, reportedState } from './ha.mjs';
 import { archiveRun, atomicJson, json, mergeStatistics, validateArchive } from './archive.mjs';
 import { learnProfiles } from './learning.mjs';
 import { localParts, midnight, label } from './time.mjs';
 
-export const VERSION = '0.2.1';
+export const VERSION = '0.3.0';
 export const DEFAULT_NOTIFICATIONS = {
   mobile: 'mobile_app_toms_iphone',
   alexa: ['notify.echo_badezimmer_durchsagen','notify.thomas_echo_show_8_durchsagen','notify.echo_schlafzimmer_durchsagen',
@@ -60,6 +61,7 @@ export async function startService(directory = '/data', { port = 8099, host = '0
   let options = await json(join(directory,'options.json'), {});
   let privateSettings = await json(join(directory,'private.json'), {});
   let state = await json(join(directory,'state.json'), {});
+  if(state.status==='running'){state.status='failed';state.failureReason='Vorheriger Lauf wurde unterbrochen. Bitte bei Bedarf manuell erneut berechnen.';await atomicJson(join(directory,'state.json'),state);}
   let busy = false, ticking = false;
   const csrf = randomBytes(24).toString('hex');
   if (process.env.SUPERVISOR_TOKEN) {
@@ -88,19 +90,22 @@ export async function startService(directory = '/data', { port = 8099, host = '0
     }
     return '/config/apps/dashboard';
   }
-  async function run(manual = false) {
+  async function run(manual = false, notify = true) {
+    if(typeof notify!=='boolean')throw Error('Benachrichtigungswahl muss ja oder nein sein');
     if (busy) throw Error('Eine Berechnung läuft bereits.');
     busy = true;
     const at = new Date().toISOString();
     let config, snapshot, stage='configuration';
     try {
+      state.lastAttempt=at;state.status='running';await persist();
       config = await settings();
       state.attemptDate = localParts(Date.now(),config.timeZone).date; state.lastAttempt = at; state.status = 'running'; await persist();
       stage='inputs'; snapshot = await collect(config);
       stage='planning'; const report = plan(config,snapshot);
       if (!report.scenarios.some(s=>s.plan)) throw Error('Keine der vier Varianten konnte berechnet werden.');
       stage='archive'; const id = await archiveRun(directory,snapshot,config,report,render,VERSION);
-      state.latest = id; state.status = report.scenarios.some(s=>s.error) ? 'partial' : 'success'; state.lastSuccess = at;
+      state.latest = id; state.status = report.scenarios.some(s=>s.error) ? 'partial' : 'success'; state.lastSuccess = snapshot.generatedAt; state.completedAt=new Date().toISOString();
+      if(!notify){state.notification={status:'suppressed',mobile:'suppressed',alexa:'suppressed'};await persist();return id;}
       state.notification = { attemptedAt:new Date().toISOString(), status:'attempting' }; await persist();
       const delivery=await sendNotifications(notifyConfig(),announcement(report),await reportUrl());
       state.notification = { ...state.notification, status:Object.values(delivery).every(s=>s==='sent')?'sent':'partial', ...delivery }; await persist();
@@ -111,14 +116,15 @@ export async function startService(directory = '/data', { port = 8099, host = '0
       state.failureReason=safeError(e);
       await atomicJson(join(directory,'failures',`${at.replace(/[:.]/g,'-')}.json`), { at, manual, stage, config, snapshot, error:state.failureReason, version:VERSION });
       await persist();
-      state.failureNotification = await sendNotifications(notifyConfig(),'Die Energieplanung konnte heute keinen neuen gültigen Plan erstellen. Bitte prüfe den Status im Energieplaner. Ein älterer Bericht ist keine neue Empfehlung.',await reportUrl()); await persist();
+      state.failureNotification = notify ? await sendNotifications(notifyConfig(),'Die Energieplanung konnte heute keinen neuen gültigen Plan erstellen. Bitte prüfe den Status im Energieplaner. Ein älterer Bericht ist keine neue Empfehlung.',await reportUrl()) : {status:'suppressed'}; await persist();
       throw Error('Planung fehlgeschlagen. Konfiguration, Zugänge und Datenabdeckung prüfen.');
     } finally { busy = false; }
   }
   async function capture(config, now) {
     const ids = new Set([...Object.values(ACTUAL_ENTITIES), ...Object.values(config.entities).filter(Boolean),
       'binary_sensor.zoe_ladestatus','sensor.zoe_ladezustand','device_tracker.zoe_standort']);
-    const states = (await haRequest('states')).filter(s=>ids.has(s.entity_id)).map(s=>({ entity_id:s.entity_id,state:s.state,last_updated:s.last_updated,last_changed:s.last_changed,
+    const liveSoc=await reportedState(config.entities.batterySoc);
+    const states = (await haRequest('states')).filter(s=>ids.has(s.entity_id)).map(s=>s.entity_id===liveSoc.entity_id?liveSoc:s).map(s=>({ entity_id:s.entity_id,state:s.state,last_updated:s.last_updated,last_changed:s.last_changed,last_reported:s.last_reported,
       unit:s.attributes.unit_of_measurement, attributes:s.entity_id===config.entities.forecastSolar?s.attributes:undefined }));
     await appendFile(join(directory,'actual',`${localParts(now,config.timeZone).date}-samples.jsonl`),JSON.stringify({at:new Date(now).toISOString(),states})+'\n');
   }
@@ -163,13 +169,21 @@ export async function startService(directory = '/data', { port = 8099, host = '0
     } catch { /* Detailed status is visible without logging credentials. */ }
     finally { ticking=false; }
   }
+  async function latestManifest(){
+    for(const id of (await readdir(join(directory,'runs'))).sort().reverse()){
+      const m=await json(join(directory,'runs',id,'manifest.json'),null);
+      if(m&&m.id===id){const p=await json(join(directory,'runs',id,'plan.json'),null);if(p?.generatedAt===m.generatedAt&&p.scenarios.some(s=>s.plan))return m;}
+    }
+    return null;
+  }
   const files = new Set(['report.html','report.md','plan.json','input.json','config.json','forecast.csv','validation.json','validation.csv','validation.html','manifest.json']);
   async function handler(req,res) {
     if(req.method==='GET'&&req.url==='/health'){res.writeHead(200);res.end('ok');return;}
     res.setHeader('Cache-Control','no-store'); res.setHeader('X-Content-Type-Options','nosniff');
     if (ingressOnly && !['172.30.32.2','::ffff:172.30.32.2'].includes(req.socket.remoteAddress)) { res.writeHead(403);res.end('Nur HA Ingress');return; }
     try {
-      const path=new URL(req.url,'http://localhost').pathname.replace(/^\//,'');
+      const requestUrl=new URL(req.url,'http://localhost');
+      const path=requestUrl.pathname.replace(/^\//,'');
       if (req.method==='POST') {
         let body='';for await(const chunk of req){body+=chunk;if(body.length>100_000)throw Error('Eingabe zu groß');}
         if(req.headers['x-planner-csrf']!==csrf)throw Error('Ungültige Formularsitzung');
@@ -179,14 +193,46 @@ export async function startService(directory = '/data', { port = 8099, host = '0
           if(!input.solcast_api_key||!input.solcast_resource_id)throw Error('Solcast-Zugang fehlt');
           privateSettings={planner_json:config,solcast_api_key:input.solcast_api_key,solcast_resource_id:input.solcast_resource_id};
           await atomicJson(join(directory,'private.json'),privateSettings);
-        } else if(path==='run') { if(busy)throw Error('Berechnung läuft'); run(true).catch(()=>{}); }
+        } else if(path==='run') { if(busy)throw Error('Berechnung läuft');const input=JSON.parse(body||'{}');if(input.notify!==undefined&&typeof input.notify!=='boolean')throw Error('Ungültige Benachrichtigungswahl');run(true,input.notify??true).catch(()=>{}); }
+        else if(/^runs\/[\dTZ-]+\/decision$/.test(path)){
+          const id=path.split('/')[1],folder=join(directory,'runs',id);const manifest=await json(join(folder,'manifest.json'));
+          if(manifest.id!==id)throw Error('Ungültiger Lauf');
+          await recordDecision(folder,manifest,await json(join(folder,'plan.json')),await json(join(folder,'config.json')),JSON.parse(body));
+          await validateArchive(directory,ACTUAL_ENTITIES);
+        }
         else throw Error('Unbekannte Aktion');
         res.writeHead(200,{'Content-Type':'application/json'});res.end('{"ok":true}');return;
       }
       if(req.method!=='GET'){res.writeHead(405);res.end();return;}
+      if(path==='latest'){
+        const latest=await latestManifest();if(!latest){res.writeHead(404);res.end('Noch kein gültiger Plan');return;}
+        res.writeHead(302,{Location:`runs/${latest.id}/report.html`});res.end();return;
+      }
+      const review=path.match(/^runs\/([\dTZ-]+)\/(review|decisions.json|validation-history.json)$/);
+      if(review){
+        const folder=join(directory,'runs',review[1]),manifest=await json(join(folder,'manifest.json')),report=await json(join(folder,'plan.json'));
+        const context=await decisionContext(folder,report);
+        if(review[2]==='review'){res.setHeader('Content-Type','text/html; charset=utf-8');res.end(decisionPage(manifest,report,await json(join(folder,'config.json')),context,csrf));}
+        else{
+          res.setHeader('Content-Type','application/json');
+          if(review[2]==='decisions.json')res.end(JSON.stringify({runId:manifest.id,horizon:{start:manifest.start,end:manifest.end},...context}));
+          else{const history=[];let names=[];try{names=await readdir(join(folder,'validation-history'));}catch(e){if(e.code!=='ENOENT')throw e;}for(const name of names.sort())if(/^[a-z0-9-]+\.json$/.test(name))history.push(await json(join(folder,'validation-history',name)));res.end(JSON.stringify(history));}
+        }
+        return;
+      }
       const match=path.match(/^runs\/([\dTZ-]+)\/([a-z.]+)$/);
       if(match&&files.has(match[2])) {
-        const data=await readFile(join(directory,'runs',match[1],match[2]));
+        const folder=join(directory,'runs',match[1]);
+        let data=await readFile(join(folder,match[2]));
+        res.setHeader('X-Archive-SHA256',createHash('sha256').update(data).digest('hex'));
+        const download=requestUrl.searchParams.get('download')==='1';
+        if(download)res.setHeader('Content-Disposition',`attachment; filename="${match[1]}-${match[2]}"`);
+        if(match[2]==='report.html'&&!download){
+          const m=await json(join(folder,'manifest.json')),p=await json(join(folder,'plan.json')),c=await decisionContext(folder,p);
+          const latest=await latestManifest(),zone=(await json(join(folder,'config.json'))).timeZone;
+          const banner=`<aside style="padding:20px;background:#fff3ce;color:#173a37;font:15px/1.5 system-ui"><b>Lauf ${escape(m.id)}</b> · Erstellt ${label(Date.parse(m.generatedAt),zone)} · Horizont ${label(m.start,zone)} – ${label(m.end,zone)}<br>${Date.now()>=m.end?'Planungshorizont abgelaufen. ':''}${latest?.id!==m.id?'Älterer Archivbericht. ':''}Geplante Variante: ${c.planned?escape(c.planned.scenarioId):'nicht bestätigt'} · Umsetzung: ${c.implemented?escape(c.implemented.scenarioId):'nicht angegeben'}<br><a href="review">Variante bestätigen / Umsetzung protokollieren</a> · <a href="report.html?download=1">Unveränderte Archivdatei herunterladen</a> · <a href="../../latest">Aktuellen gültigen Plan öffnen</a> · <a href="../../">Übersicht</a></aside>`;
+          data=data.toString().replace('<body>','<body>'+banner);
+        }
         res.setHeader('Content-Type',match[2].endsWith('.html')?'text/html; charset=utf-8':match[2].endsWith('.json')?'application/json':'text/plain; charset=utf-8');res.end(data);return;
       }
       const actual=path.match(/^actual\/([\d-]+-(?:statistics\.json|samples\.jsonl|zoe-history\.json))$/);
@@ -196,19 +242,20 @@ export async function startService(directory = '/data', { port = 8099, host = '0
       for(const id of (await readdir(join(directory,'runs'))).sort().reverse()){
         const m=await json(join(directory,'runs',id,'manifest.json'),null);if(m){m.validation=await json(join(directory,'runs',id,'validation.json'),null);runs.push(m);}
       }
+      const latest=await latestManifest();
       const actualFiles=(await readdir(join(directory,'actual'))).sort().reverse();
       const configured=!!(privateSettings.planner_json||options.planner_json);
       const dateLabel=value=>value?label(Date.parse(value),'Europe/Vienna'):'noch keiner';
       const statusLabel={success:'Berechnung erfolgreich',partial:'Bericht mit Einschränkungen',failed:'Berechnung fehlgeschlagen',running:'Berechnung läuft'}[state.status]??(configured?'Bereit':'Einrichtung erforderlich');
-      const deliveryLabel=channel=>({sent:'gesendet',failed:'fehlgeschlagen'}[state.notification?.[channel]]??'noch nicht gesendet');
-      const script=`const token=${JSON.stringify(csrf)};async function send(path,body){const r=await fetch(path,{method:'POST',headers:{'X-Planner-CSRF':token},body:JSON.stringify(body)});if(!r.ok){alert(await r.text());return;}location.reload();}document.querySelector('#run').onclick=()=>send('run',{});document.querySelector('#setup').onchange=async e=>{try{await send('settings',JSON.parse(await e.target.files[0].text()));}catch{alert('Ungültige Einstellungsdatei');}};`;
+      const deliveryLabel=channel=>({sent:'gesendet',failed:'fehlgeschlagen',suppressed:'bewusst ohne Benachrichtigung'}[state.notification?.[channel]]??'noch nicht gesendet');
+      const script=`const token=${JSON.stringify(csrf)};async function send(path,body){const r=await fetch(path,{method:'POST',headers:{'X-Planner-CSRF':token},body:JSON.stringify(body)});if(!r.ok){alert(await r.text());return;}location.reload();}document.querySelector('#run').onclick=()=>send('run',{notify:true});document.querySelector('#quiet').onclick=()=>send('run',{notify:false});document.querySelector('#setup').onchange=async e=>{try{await send('settings',JSON.parse(await e.target.files[0].text()));}catch{alert('Ungültige Einstellungsdatei');}};`;
       res.setHeader('Content-Type','text/html; charset=utf-8');
-      res.end(`<!doctype html><html lang="de"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Energieplaner</title><style>body{font:16px/1.5 system-ui;background:#f2f5f0;color:#173a37;max-width:1100px;margin:35px auto;padding:20px}section{background:white;padding:24px;border-radius:14px;margin:20px 0}a{color:#176d68}button{padding:12px;cursor:pointer}small{color:#576b66}li{margin:12px 0}table{border-collapse:collapse}td,th{text-align:left;padding:10px;border-bottom:1px solid #ddd}</style><h1>PV- und Ladeplanung</h1><p>Version ${VERSION} · täglich 20:00 Europe/Vienna · Empfehlungsbetrieb</p>
-      <section><h2>Status: ${statusLabel}</h2><p>Letzter Versuch: ${dateLabel(state.lastAttempt)}<br>Letzter gültiger Plan: ${dateLabel(state.lastSuccess)}<br>Ist-Aufzeichnung: ${escape(state.captureStatus??'wartet')} · Statistik/Validierung: ${escape(state.statisticsStatus??'wartet')}<br>Handy: ${deliveryLabel('mobile')} · Alexa: ${deliveryLabel('alexa')}${state.status==='failed'?`<br>Hinweis: ${escape(state.failureReason??'Eingaben und Datenabdeckung prüfen.')}`:''}<br>Letzte Profilaktualisierung: ${escape(state.profileDate??'noch keine')}</p><p>Ein alter Bericht bleibt im Archiv. Maßgeblich sind sein Erstellungsdatum und Planungshorizont.</p><button id="run" ${busy||!configured?'disabled':''}>Jetzt berechnen und benachrichtigen</button>${state.latest?` <a href="runs/${state.latest}/report.html">Letzten Bericht öffnen</a>`:''}</section>
+      res.end(`<!doctype html><html lang="de"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Energieplaner</title>${busy?'<meta http-equiv="refresh" content="3">':''}<style>body{font:16px/1.5 system-ui;background:#f2f5f0;color:#173a37;max-width:1100px;margin:35px auto;padding:20px}section{background:white;padding:24px;border-radius:14px;margin:20px 0}a{color:#176d68}button{padding:12px;cursor:pointer}small{color:#576b66}li{margin:12px 0}table{border-collapse:collapse}td,th{text-align:left;padding:10px;border-bottom:1px solid #ddd}</style><h1>PV- und Ladeplanung</h1><p>Version ${VERSION} · täglich 20:00 Europe/Vienna · Empfehlungsbetrieb</p>
+      <section><h2>Status: ${statusLabel}</h2><p>Letzter Versuch: ${dateLabel(state.lastAttempt)}<br>Letzter gültiger Plan: ${dateLabel(latest?.generatedAt)}<br>Ist-Aufzeichnung: ${escape(state.captureStatus??'wartet')} · Statistik/Validierung: ${escape(state.statisticsStatus??'wartet')}<br>Handy: ${deliveryLabel('mobile')} · Alexa: ${deliveryLabel('alexa')}${state.status==='failed'?`<br>Hinweis: ${escape(state.failureReason??'Eingaben und Datenabdeckung prüfen.')}`:''}<br>Letzte Profilaktualisierung: ${escape(state.profileDate??'noch keine')}</p><p>Ein alter Bericht bleibt im Archiv. Maßgeblich sind sein Erstellungsdatum und Planungshorizont.</p><button id="run" ${busy||!configured?'disabled':''}>Jetzt berechnen und benachrichtigen</button> <button id="quiet" ${busy||!configured?'disabled':''}>Jetzt ohne Benachrichtigung berechnen</button>${latest?` <a href="latest">Aktuellen gültigen Plan öffnen</a> · <a href="runs/${latest.id}/review">Variante bestätigen / Umsetzung</a><br><small>Lauf ${latest.id} · gültig für ${label(latest.start,'Europe/Vienna')} bis ${label(latest.end,'Europe/Vienna')}${Date.now()>=latest.end?' – Zeitraum abgelaufen':''}</small>`:''}</section>
       <section><h2>Einrichtung</h2><p>${configured?'Persönliche Konfiguration vorhanden. Import ersetzt sie.':'Bitte die vorbereitete private ha-options.json importieren. Sie enthält deine Profile und Solcast-Zugänge.'} Diese Datei bleibt lokal und gehört nicht auf GitHub.</p><input id="setup" type="file" accept="application/json"><p><small>Benachrichtigung an ${escape(notifyConfig().mobile)} und ${notifyConfig().alexa.length} Alexa-Geräte. Keine Schaltbefehle an Batterie, Zoe oder Wärmepumpe.</small></p></section>
-      <section><h2>Prognosearchiv</h2><table><tr><th>Erstellt (Ortszeit)</th><th>Berichte und vollständige Rechnung</th><th>Nachprüfung</th></tr>${runs.map(m=>`<tr><td>${dateLabel(m.generatedAt)}</td><td><a href="runs/${m.id}/report.html">HTML</a> · <a href="runs/${m.id}/forecast.csv">Viertelstunden CSV</a> · <a href="runs/${m.id}/input.json">Rohprognosen</a> · <a href="runs/${m.id}/config.json">Parameter</a> · <a href="runs/${m.id}/plan.json">JSON</a></td><td>${m.validation?`<a href="runs/${m.id}/validation.html">Prüfbericht</a> · <a href="runs/${m.id}/validation.json">JSON</a> · <a href="runs/${m.id}/validation.csv">CSV</a><br><small>${m.validation.complete?'vollständig':'enthält Datenlücken'}</small>`:`Prüfung ab ${label(m.end+7200000,'Europe/Vienna')}`}</td></tr>`).join('')}</table></section>
+      <section><h2>Prognosearchiv</h2><table><tr><th>Erstellt (Ortszeit)</th><th>Berichte und vollständige Rechnung</th><th>Nachprüfung</th></tr>${runs.map(m=>`<tr><td>${dateLabel(m.generatedAt)}</td><td><a href="runs/${m.id}/report.html">HTML</a> · <a href="runs/${m.id}/review">Bestätigung / Umsetzung</a> · <a href="runs/${m.id}/forecast.csv">Viertelstunden CSV</a> · <a href="runs/${m.id}/input.json">Rohprognosen</a> · <a href="runs/${m.id}/config.json">Parameter</a> · <a href="runs/${m.id}/plan.json">JSON</a></td><td>${m.validation?`<a href="runs/${m.id}/validation.html">Prüfbericht</a> · <a href="runs/${m.id}/validation.json">JSON</a> · <a href="runs/${m.id}/validation.csv">CSV</a><br><small>${m.validation.complete?'vollständig':'enthält Datenlücken'}</small>`:`Prüfung ab ${label(m.end+7200000,'Europe/Vienna')}`}</td></tr>`).join('')}</table></section>
       <section><h2>Ist-Daten</h2><p>Minütliche Zustandsaufnahmen, fünfminütige Recorder-Statistiken und tägliche Zoe-Verläufe. Fehlende Daten werden nicht als Null interpretiert. Das Archiv wird nicht automatisch gelöscht und liegt im gesicherten App-Datenverzeichnis.</p><ul>${actualFiles.map(f=>`<li><a href="actual/${f}">${f}</a></li>`).join('')}</ul></section><script>${script}</script></html>`);
-    } catch(e) {res.writeHead(e.code==='ENOENT'?404:400,{'Content-Type':'text/plain; charset=utf-8'});res.end('Nicht verfügbar oder ungültige Anfrage.');}
+    } catch(e) {res.writeHead(e.code==='ENOENT'?404:400,{'Content-Type':'text/plain; charset=utf-8'});res.end(e.code==='ENOENT'?'Nicht verfügbar.':safeError(e));}
   }
   const server=createServer((req,res)=>handler(req,res).catch(()=>{res.writeHead(500);res.end('Interner Fehler');}));
   await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(port,host,resolve);});

@@ -63,3 +63,9 @@ Forecast.Solar wird über die vorhandene HA-Aktion forecast_solar.get_forecast a
 Lade-/Entladewirkungsgrade, Batteriegrenzen und Waschenergie sind teilweise noch Annahmen. Die Fenstersuche ist heuristisch. Eine Prognoseprüfung verbessert diese Grundlagen; eine automatische Gerätesteuerung ist ausdrücklich nicht Teil dieser Version.
 
 Details zu den vorläufigen Parametern: [Kalibrierung](docs/calibration.md).
+
+## Neu in 0.3.0: Wiederholung und Bestätigung
+
+Nach einer fehlgeschlagenen Planung kann jederzeit mit oder ohne Handy-/Alexa-Meldung neu gerechnet werden. Der Link zum aktuellen gültigen Plan wird aus den abgeschlossenen Archivläufen ermittelt. Der Berichtskopf zeigt Lauf, Zeitraum und Bestätigungsstatus.
+
+Über **Variante bestätigen / Umsetzung** wird die geplante Variante ausdrücklich gespeichert. Die tatsächlich manuell am Wechselrichter gesetzten Fenster und Ziel-SOC-Werte werden danach separat protokolliert. Änderungen bleiben als zusätzliche Ereignisse erhalten und gelten nur für den konkreten Lauf; sie werden nicht auf neu gerechnete Pläne übertragen. Es findet keine Gerätesteuerung statt. Details und Sicherungskonzept: [Korrekturen und Auswahlhistorie](docs/0.3.0-fixes.md).

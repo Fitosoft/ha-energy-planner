@@ -7,6 +7,7 @@ import { collect } from './sources.mjs';
 import { markdown, html } from './report.mjs';
 import { refreshProfiles } from './profiles.mjs';
 import { solarComparison } from './solar-comparison.mjs';
+import { scenarioId, suggestedScenario } from './decisions.mjs';
 
 export function plan(config, snapshot, demo = false) {
   config = { ...config, exportEurPerKwh: snapshot.exportTariff?.eurPerKwh ?? config.exportEurPerKwh };
@@ -23,10 +24,11 @@ export function plan(config, snapshot, demo = false) {
     const name = `${withZoe ? 'Mit' : 'Ohne'} Zoe · ${withLaundry ? 'zwei zusätzliche Waschladungen' : 'ohne zusätzliche Wäsche'}`;
     try {
       const slots = makeSlots(config, snapshot, snapshot.start, snapshot.end, prices, pv, withZoe, withLaundry);
-      report.scenarios.push({ name, withZoe, withLaundry, plan: recommend(slots, config, snapshot.initialSoc) });
-    } catch (e) { report.scenarios.push({ name, withZoe, withLaundry, error: e.message }); }
+      report.scenarios.push({ id:scenarioId({withZoe,withLaundry}), name, withZoe, withLaundry, plan: recommend(slots, config, snapshot.initialSoc) });
+    } catch (e) { report.scenarios.push({ id:scenarioId({withZoe,withLaundry}), name, withZoe, withLaundry, error: e.message }); }
   }
   report.warnings.push(`Wäsche-Szenario: zwei zusätzliche Ladungen, je ${config.laundry.cycleKwh ?? '?'} kWh und ${config.laundry.durationMinutes ?? '?'} Minuten. Vorläufige Annahme, nicht gemessen; bereits im Grundprofil enthaltene Wäsche bleibt enthalten.`);
+  report.suggestedScenarioId=suggestedScenario(report);
   return report;
 }
 async function main() {

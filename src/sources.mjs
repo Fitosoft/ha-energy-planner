@@ -1,4 +1,4 @@
-import { apiUrl, haRequest } from './ha.mjs';
+import { apiUrl, haRequest, reportedState } from './ha.mjs';
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { awattar, fresh, number, plugDefault, timestamp } from './inputs.mjs';
@@ -23,11 +23,9 @@ export async function collect(config, now = Date.now()) {
   const exportTariff = exportTariffFromPreferences(await energyPreferences(base, haToken), config.exportMeter ?? null);
   const ids = config.entities;
   const [soc, zoeSoc, plug, plugText, activity, market] = await Promise.all([
-    state(ids.batterySoc), state(ids.zoeSoc), state(ids.zoePlug), state(ids.zoePlugText), state(ids.zoeActivity), state(ids.market)
+    reportedState(ids.batterySoc), state(ids.zoeSoc), state(ids.zoePlug), state(ids.zoePlugText), state(ids.zoeActivity), state(ids.market)
   ]);
-  fresh(soc.last_updated, now, 0.5, 'Hausbatterie-SOC');
-  if (soc.state === '' || ['unknown', 'unavailable'].includes(soc.state)) throw Error('Hausbatterie-SOC fehlt');
-  const initialSoc = number(Number(soc.state), 'Hausbatterie-SOC', 0, 100);
+  const initialSoc = batterySoc(soc, now);
   let zoeFresh = true;
   try { fresh(activity.state, now, 24, 'Zoe-Aktivität'); } catch { zoeFresh = false; }
   const warnings = [];
@@ -76,5 +74,15 @@ export async function collect(config, now = Date.now()) {
     marketFetchedAt: new Date(now).toISOString(), solarFetchedAt: solar.fetchedAt,
     market: marketData, solar: solar.data, forecastSolar, exportTariff,
     sourceState: { marketLastUpdated: market.last_updated, marketRange: market.attributes?.data?.map(r => [r.start_timestamp, r.end_timestamp]),
-      batteryUpdated: soc.last_updated, zoeActivity: activity.state, plug: plug.state, plugText: plugText.state } };
+      batteryUpdated: soc.last_updated, batteryReported:soc.last_reported, batteryTimestampSource:'HA live template', haNow:soc.server_now,
+      zoeActivity: activity.state, plug: plug.state, plugText: plugText.state } };
+}
+export function batterySoc(soc, now) {
+  if (typeof soc?.state !== 'string' || !soc.state.trim()) throw Error('Hausbatterie-SOC fehlt');
+  const value=number(Number(soc.state),'Hausbatterie-SOC',0,100);
+  for(const when of [soc.last_reported??soc.last_updated,soc.server_now].filter(v=>v!==undefined))if(typeof when!=='string'||!/(Z|[+-]\d{2}:\d{2})$/i.test(when))throw Error('Hausbatterie-SOC: Zeitstempel ohne gültige Zeitzone');
+  if (soc.server_now && Math.abs(timestamp(soc.server_now)-now)>5*60_000) throw Error('HA-Uhr und Planer-Uhr weichen um mehr als fünf Minuten ab');
+  // A missing last_reported may fall back to a recent update; an old update is never assumed fresh.
+  fresh(soc.last_reported ?? soc.last_updated,now,0.5,'Hausbatterie-SOC');
+  return value;
 }

@@ -58,7 +58,8 @@ export function resample(rows, start, end, name) {
 }
 export function fresh(when, now, maxHours, name) {
   const age = now - timestamp(when);
-  if (age < -5 * 60_000 || age > maxHours * 3_600_000) throw Error(`${name}: Daten veraltet oder Zeitstempel in der Zukunft`);
+  if (age < -5 * 60_000) throw Error(`${name}: Zeitstempel in der Zukunft; Uhrzeit prüfen`);
+  if (age > maxHours * 3_600_000) throw Error(`${name}: Daten veraltet (${Math.round(age/60_000)} Minuten)`);
 }
 export function plugDefault(binary, text) {
   const a = binary === 'on' ? true : binary === 'off' ? false : null;

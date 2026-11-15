@@ -1,6 +1,8 @@
 import { mkdir, readFile, writeFile, rename, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { localParts, nextDate } from './time.mjs';
+import { decisionContext, suggestedScenario, scenarioId } from './decisions.mjs';
+import { randomUUID } from 'node:crypto';
 
 export async function json(file, fallback) {
   try { return JSON.parse(await readFile(file, 'utf8')); }
@@ -32,14 +34,14 @@ export async function archiveRun(directory, snapshot, config, report, render, ve
   await writeFile(join(folder, 'report.html'), render.html(report, config));
   await writeFile(join(folder, 'report.md'), render.markdown(report, config));
   await writeFile(join(folder, 'forecast.csv'), csv(report.scenarios.flatMap((s, scenario) => (s.plan?.trace ?? []).map(t => ({
-    scenario, withZoe: s.withZoe, withLaundry: s.withLaundry, start: new Date(t.start).toISOString(), end: new Date(t.end).toISOString(),
+    scenario, scenarioId:s.id??scenarioId(s), withZoe: s.withZoe, withLaundry: s.withLaundry, start: new Date(t.start).toISOString(), end: new Date(t.end).toISOString(),
     baseKwh: t.baseKwh, zoeKwh: t.zoeKwh, laundryKwh: t.laundryKwh, legionellaKwh: t.legionellaKwh,
     loadKwh: t.loadKwh, pvKwh: t.pvKwh, priceEurPerKwh: t.price, importKwh: t.importKwh, exportKwh: t.exportKwh,
     chargeKwh: t.chargeKwh, dischargeKwh: t.dischargeKwh, soc: t.soc, forced: t.forced, targetSoc: t.targetSoc
   })))));
   // Commit marker last: incomplete runs are retained but never published as valid.
   await atomicJson(join(folder, 'manifest.json'), { schemaVersion: 1, version, id, generatedAt: snapshot.generatedAt,
-    start: report.start, end: report.end, targetDate: snapshot.targetDate, scenarioErrors: report.scenarios.filter(s => s.error).map(s => s.error) });
+    start: report.start, end: report.end, targetDate: snapshot.targetDate, suggestedScenarioId:suggestedScenario(report), scenarioErrors: report.scenarios.filter(s => s.error).map(s => s.error) });
   return id;
 }
 export async function mergeStatistics(directory, statistics, zone) {
@@ -73,8 +75,10 @@ function observed(rows, start, end, mode) {
 export function validationHtml(result) {
   const n=v=>v===null?'fehlend':v.toLocaleString('de-AT',{maximumFractionDigits:3});
   const pv=result.pvSources;
+  const selection=result.selection;
+  const selectionNote=selection?`<section><h2>Planbestätigung bei dieser Prüfung</h2><p>Geplant: ${selection.planned?.scenarioId??'nicht bestätigt'} · Manuelle Umsetzung: ${selection.implemented?.scenarioId??'nicht angegeben'} · Historienstand ${selection.revision}</p><p>Umsetzungsangaben stammen vom Nutzer und sind nicht automatisch am Gerät verifiziert. <a href="review">Bestätigungen und genaue Fenster ansehen</a> · <a href="validation-history.json">Frühere Prüfstände</a></p></section>`:'';
   const comparison=pv?`<section><h2>PV-Tagesprognosen: ${pv.date}</h2><p>Gemessener Tagesertrag: ${n(pv.actualKwh)} kWh. Eine Tagesabweichung wird nur bei vollständiger Messreihe berechnet.</p><table><tr><th>Quelle</th><th>Prognose</th><th>Ist minus Prognose</th></tr>${pv.sources.map(s=>`<tr><td>${s.name}</td><td>${n(s.kwh)} kWh</td><td>${n(s.errorKwh)} kWh</td></tr>`).join('')}</table></section>`:'';
-  return `<!doctype html><html lang="de"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Prognoseprüfung</title><style>body{font:16px/1.5 system-ui;max-width:1100px;margin:30px auto;padding:20px;background:#f2f5f0;color:#173a37}section{background:white;padding:24px;margin:20px 0;border-radius:14px}td,th{padding:10px;border-bottom:1px solid #ddd;text-align:right}th:first-child,td:first-child{text-align:left}table{width:100%;border-collapse:collapse}</style><h1>Prognose und Ist</h1>${comparison}<p>${result.warning}</p><p>Fehler = Ist minus Prognose. Vergleichssummen verwenden ausschließlich vollständig abgedeckte Viertelstunden. Fehlende Werte werden nicht als Null gerechnet.</p>${result.scenarios.map(s=>`<section><h2>${s.name.replaceAll('&','&amp;').replaceAll('<','&lt;')}</h2><table><tr><th>Messgröße</th><th>Abdeckung</th><th>Prognose</th><th>Ist</th><th>Fehler</th><th>Mittlerer absoluter Fehler je 15 min</th></tr>${[['Hausverbrauch',s.load],['PV',s.pv]].map(([name,m])=>`<tr><td>${name}</td><td>${m.coveredSlots}/${m.expectedSlots}</td><td>${n(m.forecastKwhOnCoveredSlots)} kWh</td><td>${n(m.actualKwhOnCoveredSlots)} kWh</td><td>${n(m.actualKwhOnCoveredSlots-m.forecastKwhOnCoveredSlots)} kWh</td><td>${n(m.maeKwhPerSlot)} kWh</td></tr>`).join('')}</table></section>`).join('')}<p>Viertelstundenwerte, SOC, Energiefluss-Bilanzrest und gemessener Stromsaldo stehen in der zugehörigen CSV-/JSON-Datei. Der Bilanzrest kann Umwandlungsverluste und versetzte Messzeitpunkte enthalten. Gemessener Stromsaldo ist Bezug minus Einspeiseerlös ohne Batterieverschleiß; keine nachgewiesene Optimierungsersparnis.</p></html>`;
+  return `<!doctype html><html lang="de"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Prognoseprüfung</title><style>body{font:16px/1.5 system-ui;max-width:1100px;margin:30px auto;padding:20px;background:#f2f5f0;color:#173a37}section{background:white;padding:24px;margin:20px 0;border-radius:14px}td,th{padding:10px;border-bottom:1px solid #ddd;text-align:right}th:first-child,td:first-child{text-align:left}table{width:100%;border-collapse:collapse}</style><h1>Prognose und Ist</h1>${selectionNote}${comparison}<p>${result.warning}</p><p>Fehler = Ist minus Prognose. Vergleichssummen verwenden ausschließlich vollständig abgedeckte Viertelstunden. Fehlende Werte werden nicht als Null gerechnet.</p>${result.scenarios.map(s=>`<section><h2>${s.name.replaceAll('&','&amp;').replaceAll('<','&lt;')}</h2><table><tr><th>Messgröße</th><th>Abdeckung</th><th>Prognose</th><th>Ist</th><th>Fehler</th><th>Mittlerer absoluter Fehler je 15 min</th></tr>${[['Hausverbrauch',s.load],['PV',s.pv]].map(([name,m])=>`<tr><td>${name}</td><td>${m.coveredSlots}/${m.expectedSlots}</td><td>${n(m.forecastKwhOnCoveredSlots)} kWh</td><td>${n(m.actualKwhOnCoveredSlots)} kWh</td><td>${n(m.actualKwhOnCoveredSlots-m.forecastKwhOnCoveredSlots)} kWh</td><td>${n(m.maeKwhPerSlot)} kWh</td></tr>`).join('')}</table></section>`).join('')}<p>Viertelstundenwerte, SOC, Energiefluss-Bilanzrest und gemessener Stromsaldo stehen in der zugehörigen CSV-/JSON-Datei. Der Bilanzrest kann Umwandlungsverluste und versetzte Messzeitpunkte enthalten. Gemessener Stromsaldo ist Bezug minus Einspeiseerlös ohne Batterieverschleiß; keine nachgewiesene Optimierungsersparnis.</p></html>`;
 }
 export function validateForecast(report, statistics, entities) {
   const comparison=report.pvComparison;
@@ -105,7 +109,7 @@ export function validateForecast(report, statistics, entities) {
           forecastKwhOnCoveredSlots: good.reduce((n,r)=>n+r[`${key}ForecastKwh`],0),
           maeKwhPerSlot: good.length ? good.reduce((n,r)=>n+Math.abs(r[`${key}ErrorKwh`]),0)/good.length : null };
       };
-      return { name: s.name, withZoe: s.withZoe, withLaundry: s.withLaundry, load: metrics('load'), pv: metrics('pv'), rows };
+      return { id:s.id??scenarioId(s), name: s.name, withZoe: s.withZoe, withLaundry: s.withLaundry, load: metrics('load'), pv: metrics('pv'), rows };
     }) };
 }
 export async function validateArchive(directory, entities, now = Date.now()) {
@@ -113,19 +117,25 @@ export async function validateArchive(directory, entities, now = Date.now()) {
     const folder = join(directory, 'runs', id), manifest = await json(join(folder, 'manifest.json'), null);
     if (!manifest || manifest.end > now - 2*3_600_000) continue;
     const previous = await json(join(folder, 'validation.json'), null);
-    if (previous?.complete || previous?.finalized) continue;
+    const report=await json(join(folder,'plan.json'));
+    const selection=await decisionContext(folder,report);
+    if ((previous?.complete || previous?.finalized) && previous.selection?.revision===selection.revision) continue;
     const config=await json(join(folder,'config.json'));
     const all={};
     for(let date=localParts(manifest.start,config.timeZone).date;date<=localParts(manifest.end-1,config.timeZone).date;date=nextDate(date)) {
       const data=await json(join(directory,'actual',`${date}-statistics.json`),{});
       for(const[entity,rows]of Object.entries(data))(all[entity]??=[]).push(...rows);
     }
-    const result = validateForecast(await json(join(folder, 'plan.json')), all, entities);
+    const result = previous?.complete||previous?.finalized ? {...previous} : validateForecast(report, all, entities);
+    result.selection=selection;
     result.checkedAt = new Date(now).toISOString();
     result.complete = result.scenarios.length > 0 && result.scenarios.every(s => s.load.coverage === 1 && s.pv.coverage === 1);
     result.finalized = result.complete || now-manifest.end>7*86400_000;
+    await mkdir(join(folder,'validation-history'),{recursive:true});
+    if(previous&&!(await readdir(join(folder,'validation-history'))).length)await writeFile(join(folder,'validation-history',`previous-${randomUUID()}.json`),JSON.stringify(previous,null,2),{flag:'wx',flush:true});
+    await writeFile(join(folder,'validation-history',`${now}-${randomUUID()}.json`),JSON.stringify(result,null,2),{flag:'wx',flush:true});
     await atomicJson(join(folder, 'validation.json'), result);
     await writeFile(join(folder, 'validation.html'), validationHtml(result));
-    await writeFile(join(folder, 'validation.csv'), csv(result.scenarios.flatMap((s, scenario) => s.rows.map(r => ({ scenario, ...r })))));
+    await writeFile(join(folder, 'validation.csv'), csv(result.scenarios.flatMap((s, scenario) => s.rows.map(r => ({ scenario, scenarioId:s.id??scenarioId(s),plannedScenarioId:selection.planned?.scenarioId,implementedScenarioId:selection.implemented?.scenarioId,decisionRevision:selection.revision,...r })))));
   }
 }

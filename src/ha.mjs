@@ -12,6 +12,11 @@ export async function haRequest(path, body, fetcher = fetch) {
   if (!response.ok) throw Error(`HA-Aufruf fehlgeschlagen (HTTP ${response.status})`);
   return response.json();
 }
+export async function reportedState(entity, request = haRequest) {
+  if (!/^[a-z_]+\.[a-z0-9_]+$/.test(entity)) throw Error('Ungültige Messentität');
+  // HA 2026.9 caches serialized REST state timestamps; read the live State property.
+  return request('template', { template: `{% set s = states[${JSON.stringify(entity)}] %}{{ dict(entity_id=s.entity_id, state=s.state, attributes=dict(s.attributes), last_changed=s.last_changed.isoformat(), last_updated=s.last_updated.isoformat(), last_reported=s.last_reported.isoformat() if s.last_reported is defined else none, server_now=now().isoformat()) | to_json }}` });
+}
 export function websocketRequest(base, token, command, WebSocketClass = WebSocket, timeoutMs = 30_000) {
   const url = apiUrl(base, 'websocket');
   if (url.hostname === 'supervisor' && url.pathname === '/core/api/websocket') url.pathname = '/core/websocket';

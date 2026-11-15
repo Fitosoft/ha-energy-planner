@@ -101,6 +101,7 @@ test('complete service run archives four variants, publishes success and notifie
   const originalFetch=globalThis.fetch, originalWS=globalThis.WebSocket;
   const originalEnv={HA_URL:process.env.HA_URL,HA_TOKEN:process.env.HA_TOKEN,SOLCAST_API_KEY:process.env.SOLCAST_API_KEY,SOLCAST_RESOURCE_ID:process.env.SOLCAST_RESOURCE_ID};
   process.env.HA_URL='http://ha.test';process.env.HA_TOKEN='test-token';
+  let reportedAt=null;
   const now=Date.now(),hour=Math.floor(now/3600000)*3600000;
   const calls=[];
   class Socket extends EventTarget{
@@ -113,6 +114,7 @@ test('complete service run archives four variants, publishes success and notifie
     const u=new URL(url);let data;
     if(u.hostname==='api.awattar.at')data={data:Array.from({length:72},(_,i)=>({start_timestamp:hour+i*3600000,end_timestamp:hour+(i+1)*3600000,marketprice:100,unit:'Eur/MWh'}))};
     else if(u.hostname==='api.solcast.com.au')data={forecasts:Array.from({length:144},(_,i)=>({period_end:new Date(hour+(i+1)*1800000).toISOString(),period:'PT30M',pv_estimate:0}))};
+    else if(u.pathname==='/api/template')data={entity_id:config.entities.batterySoc,state:'0',attributes:{},last_updated:new Date(Date.now()-5*3600000).toISOString(),last_reported:reportedAt??new Date().toISOString(),server_now:new Date().toISOString()};
     else if(u.pathname.startsWith('/api/states/')){
       const id=decodeURIComponent(u.pathname.split('/').at(-1));
       data={entity_id:id,state:id==='sensor.fs_tomorrow'?'41.411':id===config.entities.batterySoc?'50':id===config.entities.zoeSoc?'84':id===config.entities.zoeActivity?new Date().toISOString():id===config.entities.zoePlug?'off':'unplugged',last_updated:new Date().toISOString(),attributes:id==='sensor.fs_tomorrow'?{unit_of_measurement:'kWh'}:{}};
@@ -131,6 +133,12 @@ test('complete service run archives four variants, publishes success and notifie
     assert.equal(report.pvComparison.sources.at(-1).kwh,41.411);
     const state=await json(join(dir,'state.json'));assert.equal(state.status,'success');assert.equal(state.notification.mobile,'sent');assert.equal(calls.length,2);
     assert.ok(!(await readFile(join(dir,'runs',id,'input.json'),'utf8')).includes('test-key'));
+    const originalReport=await readFile(join(dir,'runs',id,'report.html'),'utf8');
+    reportedAt=new Date(Date.now()-2*3600000).toISOString();
+    await assert.rejects(service.run(true,false),/Planung fehlgeschlagen/);
+    const failed=await json(join(dir,'state.json'));assert.equal(failed.latest,id);assert.equal(failed.lastSuccess,state.lastSuccess);assert.notEqual(failed.lastAttempt,state.lastAttempt);assert.equal(calls.length,2);
+    assert.equal(await readFile(join(dir,'runs',id,'report.html'),'utf8'),originalReport);
+    reportedAt=null;const retry=await service.run(true,false);assert.notEqual(retry,id);assert.equal(calls.length,2);assert.equal((await json(join(dir,'state.json'))).notification.status,'suppressed');
   }finally{
     if(service)await service.close();globalThis.fetch=originalFetch;globalThis.WebSocket=originalWS;
     for(const[k,v]of Object.entries(originalEnv))if(v===undefined)delete process.env[k];else process.env[k]=v;
