@@ -12,13 +12,13 @@ Kalibrierung bedeutet, vorläufige Zahlen mit Messungen der eigenen Anlage abzug
 | Zoe | erster Leistungswert 1,45 kW aus Lastsprüngen; ca. 40 kWh und 85 % Ladewirkungsgrad | Weitere Starts/Stopps mit bekanntem 6-/8-/10-A-Ladestrom vergleichen. Cloud-SOC und Zeitstempel sind begrenzt genau; eine eigene Energiemessung würde die Verluste zuverlässiger trennen. |
 | Waschmaschine | je 1 kWh und 120 Minuten, gleichmäßig verteilt | Reale Programme mehrfach messen; insbesondere Heizphase und Gesamtenergie. Zwei zusätzliche Waschgänge sind Mehrverbrauch gegenüber dem bereits Wäsche enthaltenden Grundprofil. |
 | Legionellenprogramm | 4,5 kWh von 12:00 bis 14:30; Sperre 11:30 bis 15:30 | Mehrere tatsächliche Läufe auf Dauer, Energie und zeitliches Driften prüfen; parallel beginnendes Kochen erschwert die Trennung. |
-| PV-Prognose | Solcast P50 steuert das Modell | Forecast.Solar und Solcast P10/P50/P90 für denselben Folgetag archivieren und gegen Ist vergleichen. Erst mehrere Wochen mit unterschiedlichen Wetterlagen erlauben belastbare Aussagen über systematische Abweichungen. |
+| PV-Prognose | Preisrisiko über Solcast P10/P50/P90; zentrale Referenz P50 | Forecast.Solar und Solcast P10/P50/P90 für denselben Folgetag archivieren und gegen Ist vergleichen. Erst mehrere Wochen mit unterschiedlichen Wetterlagen erlauben belastbare Aussagen über systematische Abweichungen. |
 | Batterieverschleiß | 0 EUR/kWh | Wirtschaftliche Annahme, nicht direkt aus Messungen kalibrierbar. Kleine Rechenvorteile können durch unberücksichtigte Alterung verschwinden. |
 
 Die Preisformel wurde anhand der HA-Templates bestätigt. Die Einspeisevergütung wird direkt aus HA Energy gelesen. Das sind keine zu schätzenden Wirkungsgrade.
 
 Priorität: PV- und Hausverbrauchsprognose, danach Batterie-Energiebilanz/Verluste und Zusatzverbraucher. Vergleichbare Messgrenzen sind wichtiger als viele Nachkommastellen. Ein Vorteil von wenigen Cent ist bei diesen Unsicherheiten keine belastbare Ersparnis.
 
-Andere Modellgrenzen bleiben davon getrennt: heuristische Fenstersuche und 10-%-SOC-Raster, fehlender Wert der gespeicherten Energie nach Horizontende sowie keine automatische Kenntnis der tatsächlich gewählten Verbrauchervariante. Das sind keine durch einen einzelnen Korrekturfaktor lösbaren Kalibrierfragen.
+Andere Modellgrenzen bleiben davon getrennt: heuristische Fenstersuche und 10-%-SOC-Raster, fehlender Wert der gespeicherten Energie nach Horizontende sowie die Abhängigkeit von ausdrücklicher Planbestätigung und einer separat gemeldeten manuellen Umsetzung. Das sind keine durch einen einzelnen Korrekturfaktor lösbaren Kalibrierfragen.
 
 SBR160-Referenz: 320 V Nennspannung × 50 Ah = 16 kWh. Die 9,6 kW im Datenblatt sind DC-Nennleistung; bei 30 A ist die tatsächliche DC-Leistung spannungsabhängig. Quelle: [Sungrow-Datenblatt](https://info-support.sungrowpower.com/application/pdf/2022/04/21/DS_20220421_SBR096_128_160_192_224_256_Datasheet_V13_EN.pdf). Gesamtzähler aus einer App dürfen erst nach Klärung ihrer Messgrenzen als Wirkungsgradnachweis verwendet werden.

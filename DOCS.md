@@ -29,14 +29,15 @@ Der Zeitplan läuft im Dienst und benötigt keine zusätzliche HA-Automation. Ei
 
 Die Daten liegen im privaten, persistenten App-Verzeichnis `/data` und werden bei App-Updates beibehalten. Sie gehören in die HA-App-Sicherung. Die Deinstallation der App kann ihre Daten entfernen: vorher sichern. Es gibt keine automatische Löschung des Archivs.
 
-Jeder Lauf besitzt einen eigenen unveränderlichen Ordner unter `runs/`:
+Jeder abgeschlossene Lauf besitzt eigene unveränderliche Eingaben und Planberichte unter `runs/`. Spätere Bestätigungen und Prüfstände werden separat mit Historie ergänzt:
 
 - `input.json`: originale Solcast-/aWATTar-Antworten, Abrufzeitpunkte, SOC, Ansteckzustand, Einspeisetarif und optional Forecast.Solar-Zustand.
 - `config.json`: sämtliche tatsächlich verwendeten Modellparameter und Stundenprofile, ohne Zugangsschlüssel.
 - `manifest.json`: Format-/Programmversion, Planungshorizont und Szenariofehler. Die Datei wird als Abschlussmarkierung zuletzt geschrieben.
-- `plan.json`: alle vier Szenarien samt Ladefenstern, Energiefluss, SOC und Vergleich ohne Zwangsladung, jeweils im Viertelstundenraster.
+- `plan.json`: alle vier Szenarien samt Ladefenstern, Energiefluss, SOC und Vergleich ohne Zwangsladung im Viertelstundenraster; bei der Preisrisiko-Strategie zusätzlich geprüfte Kandidaten und Ergebnisse je PV-Fall.
 - `forecast.csv`, `report.html`, `report.md`: exportierbare Viertelstundenrechnung und Berichte.
-- Nach Horizontende: `validation.html`, `validation.json`, `validation.csv` mit Prognose-Ist-Vergleich.
+- Nach Horizontende: `validation.html`, `validation.json`, `validation.csv` mit Prognose-Ist-Vergleich; frühere Prüfstände unter `validation-history/`.
+- `decisions/`: unveränderliche Ereignisse für Planbestätigung und manuell gemeldete Umsetzung; `decisions.json` stellt die Historie zum Abruf bereit.
 
 Zusätzlich unter `actual/`:
 
@@ -46,7 +47,7 @@ Zusätzlich unter `actual/`:
 
 Die automatische Prüfung beginnt frühestens zwei Stunden nach Ende des Planungshorizonts, also für den Folgetagsplan typischerweise am übernächsten Morgen. Sie läuft mit der stündlichen Ist-Sicherung. Für jede Viertelstunde sind alle drei fünfminütigen Mittelwerte nötig. Fehler sind **Ist minus Prognose**. Summen und mittlere absolute Abweichung werden ausschließlich auf gemeinsam vollständig belegten Intervallen verglichen. Fehlende Werte bleiben `null`. Unvollständige Prüfungen werden bis sieben Tage nach Horizontende erneut versucht und danach mit den vorhandenen Lücken abgeschlossen.
 
-Der Prüfbericht vergleicht alle Szenarien; er weiß nicht automatisch, welche Wäschevariante tatsächlich gewählt wurde oder welche Wechselrichterfenster aktiv waren. Deshalb ist er kein Nachweis einer erzielten Kostenersparnis. Gemessene Stromkosten nutzen die beim Plan archivierten Preise; Grundgebühren und Batterieverschleiß gehören nicht zum gemessenen Stromsaldo. Der Energie-Bilanzrest kann DC/AC-Verluste und zeitversetzte Messungen enthalten. SOC-Ist ist ein Intervallmittelwert, Modell-SOC der Endwert.
+Der Prüfbericht vergleicht alle Szenarien und enthält die für den konkreten Lauf protokollierte Planbestätigung sowie die separat gemeldete manuelle Umsetzung. Ohne solche Angaben bleibt die Zuordnung unbekannt. Eine Umsetzungsmeldung ist eine Nutzerangabe, kein am Gerät gemessener Ausführungsnachweis. Deshalb ist der Prüfbericht kein Nachweis einer erzielten Kostenersparnis. Gemessene Stromkosten nutzen die beim Plan archivierten Preise; Grundgebühren und Batterieverschleiß gehören nicht zum gemessenen Stromsaldo. Der Energie-Bilanzrest kann DC/AC-Verluste und zeitversetzte Messungen enthalten. SOC-Ist ist ein Intervallmittelwert, Modell-SOC der Endwert.
 
 ## Verbrauchsprofile
 
@@ -58,7 +59,7 @@ Geeignet sind nur vollständige Messstunden mit explizit ausgeschaltetem Zoe-Lad
 
 Die sechs Alexa-Entitäten und der Handy-Dienst lassen sich in den App-Optionen ändern. Nach Änderungen die App neu starten. Der Berichtslink wird aus der eigenen App-ID abgeleitet und kann mit `report_url` überschrieben werden.
 
-Forecast.Solar wird über die vorhandene HA-Aktion forecast_solar.get_forecast aus dem HA-Cache gelesen, sobald forecastSolar.configEntry und forecastSolar.dailyEntity (der kWh-Sensor für morgen) zugeordnet sind. Die gesamte native Zeitreihe und der Tageswert werden archiviert. Es wird keine zusätzliche Forecast.Solar-API-Abfrage ausgelöst. Der Bericht vergleicht den vollständigen Folgetag mit Solcast P10/P50/P90; die Ladeplanung verwendet weiterhin P50. Nach Tagesende wird der Quellenvergleich gegen den gemessenen PV-Ertrag geprüft. Ohne vollständige Tagesmessung bleibt die Tagesabweichung unbekannt. Der alte einzelne Entitäts-Snapshot über entities.forecastSolar bleibt als Alternative unterstützt. Ohne Quelle bleibt im Bericht eine Warnung. Solcast nutzt unverändert die einzelne vereinfachte Modellanlage.
+Forecast.Solar wird über die vorhandene HA-Aktion forecast_solar.get_forecast aus dem HA-Cache gelesen, sobald forecastSolar.configEntry und forecastSolar.dailyEntity (der kWh-Sensor für morgen) zugeordnet sind. Die gesamte native Zeitreihe und der Tageswert werden archiviert. Es wird keine zusätzliche Forecast.Solar-API-Abfrage ausgelöst. Der Bericht vergleicht den vollständigen Folgetag mit Solcast P10/P50/P90; die Ladeplanung kann mit `pvStrategy: "price_risk"` P10/P50/P90 wirtschaftlich abwägen; P50 bleibt die zentrale Referenz. Nach Tagesende wird der Quellenvergleich gegen den gemessenen PV-Ertrag geprüft. Ohne vollständige Tagesmessung bleibt die Tagesabweichung unbekannt. Der alte einzelne Entitäts-Snapshot über entities.forecastSolar bleibt als Alternative unterstützt. Ohne Quelle bleibt im Bericht eine Warnung. Solcast nutzt unverändert die einzelne vereinfachte Modellanlage.
 
 Lade-/Entladewirkungsgrade, Batteriegrenzen und Waschenergie sind teilweise noch Annahmen. Die Fenstersuche ist heuristisch. Eine Prognoseprüfung verbessert diese Grundlagen; eine automatische Gerätesteuerung ist ausdrücklich nicht Teil dieser Version.
 

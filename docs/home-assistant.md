@@ -5,7 +5,7 @@
 1. Node.js >=22 verwenden. Es sind keine npm-Pakete erforderlich.
 2. `node --test` und `node src/cli.mjs demo` ausführen.
 3. `config.example.json` nach `local/config.json` kopieren; persönliche Profile und
-   bestätigte Parameter eintragen. Die lokale Datei ist bereits für den Projektbesitzer vorbereitet.
+   bestätigte Parameter eintragen. Die Beispielkonfiguration aktiviert `pvStrategy: "price_risk"`; dafür müssen P10/P50/P90 vollständig vorliegen.
 4. `.env.example` nach `local/secrets.env` kopieren und dort die Schlüssel eintragen.
    Datei nicht hochladen. Solcast-Ressource ebenfalls dort setzen.
 5. Preisformel anhand der HA-Template-Definition prüfen; erst danach
@@ -22,9 +22,7 @@
 Solcast wird einmal pro lokalem Datum und Ressource abgerufen und lokal gecacht.
 Keine automatischen Wiederholungen bei API-Fehlern. Die Endkundenpreisprüfung erfolgt
 vor dem Abruf, damit ungeklärte Konfiguration keine Solcast-Aufrufe verbraucht.
-Forecast.Solar kann über `entities.forecastSolar` als kompletter HA-Zustand mit
-Attributen mitgespeichert werden. Ohne eingerichtete Entität bleibt es ausdrücklich
-"noch nicht eingerichtet"; es werden keine Parallelprognosen erfunden.
+Forecast.Solar wird optional über `forecastSolar.configEntry` und `forecastSolar.dailyEntity` zugeordnet. Die vorhandene HA-Aktion liefert native Zeitreihe und Tageswert aus dem Cache für Archiv und Quellenvergleich. `entities.forecastSolar` bleibt als einzelner Zustandssnapshot unterstützt. Ohne Quelle bleibt die Prognose ausdrücklich fehlend; Details stehen in der [App-Dokumentation](../DOCS.md).
 
 ## Preisabdeckung
 
@@ -46,8 +44,11 @@ keine Nullwerte für fehlende Daten. Der HA-Raw-Sensor wird zum Vergleich dokume
   zuerst die Last; diese Annahme ist am konkreten Wechselrichter noch zu bestätigen.
 - PV-Überschuss darf die Batterie auch über den Zwangslade-Zielwert hinaus laden.
 - Höchstens zwei Fenster insgesamt pro Planlauf über den gesamten Planungshorizont; kein einzelnes Fenster überschreitet Mitternacht.
-- Suche fügt kostenverbessernde Fenster hinzu, Ziel-SOC in 10%-Schritten.
-  Sie ist eine Heuristik, kein Nachweis eines globalen Optimums.
+- Die Suche je PV-Fall fügt kostenverbessernde Fenster hinzu, Ziel-SOC in 10%-Schritten.
+  `price_risk` bewertet danach diese drei Vorschläge und keine Zwangsladung über alle PV-Fälle.
+  Der gewählte Vorschlag kann bei P50 mehr kosten; kein globales Optimum wird garantiert.
+- Ziel-SOC und erwarteter End-SOC sind getrennt: Leistung und Dauer können die Zielerreichung
+  begrenzen; ein höherer vorhandener SOC wird durch einen niedrigen Zielwert nicht abgesenkt.
 - Jede Variante wird mit ihrer eigenen Variante ohne Zwangsladung verglichen.
   Energie für zusätzliche Zoe-Fahrleistung ist nicht als Einsparung vergleichbar.
 - End-SOC wird nicht monetär gutgeschrieben. Zukunft jenseits des Horizonts ist unbekannt.
@@ -76,11 +77,12 @@ geeignet markierte Stundenwerte erwartet:
 Die Eignungsmarkierung muss Abwesenheiten, Zoe-Ladungen und Zusatzprogramme
 berücksichtigen. Fehlender Ladestatus ist keine Freigabe. Betrachtung: letzte
 42 Tage, Gewicht halbiert sich alle 14 Tage. Mindestens drei geeignete Werte je
-Tagesgruppe/Stunde, sonst vorherigen Wert mit Warnung behalten. Einmal wöchentlich
-ist vorgesehen; die Zeitsteuerung und automatische Klassifizierung sind noch offen.
+Tagesgruppe/Stunde, sonst vorherigen Wert mit Warnung behalten. Die HA-App führt die konservative Profilpflege montags ab 02:00 automatisch aus;
+der CLI-Aufruf dient der separaten Offline-Prüfung.
 
 Die HA-App sichert Ist-Historien, prüft abgeschlossene Prognosen und zieht die Profile wöchentlich konservativ nach. Offen bleibt die Kalibrierung der Modellparameter, siehe [Kalibrierung](calibration.md). Forecast.Solar kann mit der bestehenden HA-Konfiguration zugeordnet werden.
-Die Datenformate und Eingabesnapshots erlauben diese Erweiterungen ohne Gerätesteuerung.
+Planbestätigung und manuelle Umsetzung werden je Lauf historisch zugeordnet;
+sie werden bei einer Neuberechnung nicht automatisch übernommen.
 
 ## Wäschevarianten und Bericht
 
