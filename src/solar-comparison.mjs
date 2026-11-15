@@ -10,5 +10,5 @@ export function solarComparison(config,snapshot) {
   });
   const daily=snapshot.forecastSolar?.daily;
   sources.push({name:'Forecast.Solar',kwh:daily?.date===snapshot.targetDate&&Number.isFinite(daily.kwh)?daily.kwh:null});
-  return {date:snapshot.targetDate,start,end,sources,note:'Tageswerte für denselben Folgetag; die Ladeplanung verwendet weiterhin Solcast P50. P10/P90 sind die niedrigere/höhere Solcast-Schätzung, keine Garantie. Forecast.Solar wird aus dem bereits vorhandenen HA-Cache gelesen; Abrufzeit ist kein Beleg für den Zeitpunkt der ursprünglichen Prognose.'};
+  return {date:snapshot.targetDate,start,end,sources,note:(config.pvStrategy==='price_risk'?'Die Empfehlung wägt die Kosten unter P10/P50/P90 ab; zentrale Diagramme und Salden zeigen P50. ':'')+'Tageswerte für denselben Folgetag; die zentrale Referenzkurve ist Solcast P50. P10/P90 sind die niedrigere/höhere Solcast-Schätzung, keine Garantie. Forecast.Solar wird aus dem bereits vorhandenen HA-Cache gelesen; Abrufzeit ist kein Beleg für den Zeitpunkt der ursprünglichen Prognose.'};
 }

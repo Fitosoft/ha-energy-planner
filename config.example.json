@@ -154,5 +154,6 @@
   "forecastSolar": {
     "configEntry": null,
     "dailyEntity": null
-  }
+  },
+  "pvStrategy": "price_risk"
 }

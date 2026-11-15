@@ -73,3 +73,11 @@ Nach einer fehlgeschlagenen Planung kann jederzeit mit oder ohne Handy-/Alexa-Me
 ## Korrektur 0.3.1: Zwei Gerätefenster insgesamt
 
 Der Plan darf höchstens zwei unterschiedliche Batterie-Zeit-/SOC-Fenster über den gesamten Planungshorizont enthalten, auch wenn dieser zwei Kalendertage berührt. Bis 0.3.0 war die Begrenzung fälschlich je Kalendertag umgesetzt. Die Suche und die manuelle Umsetzungserfassung verwenden jetzt dieselbe globale Grenze. Frühere Archivberichte bleiben unverändert; enthält ein alter Bericht mehr als zwei Fenster, warnt die Ansicht davor und verlangt vor einer neuen Planbestätigung eine Neuberechnung.
+
+## Wirtschaftliche PV-Unsicherheit und erreichbarer SOC
+
+Mit `pvStrategy: "price_risk"` werden für jede der vier Verbrauchsvarianten die bestehenden heuristischen Ladepläne für Solcast P10, P50 und P90 sowie keine Zwangsladung verglichen. Jeder Kandidat wird bei allen drei PV-Verläufen mit denselben Verbrauchern und den aktuellen Bezugs- und Einspeisepreisen simuliert. Gewählt wird die kleinste maximale Kostenabweichung zum jeweils besten geprüften Kandidaten (Minimax-Regret). Das ist keine gewichtete Erwartungswertrechnung: Die Quantile sind keine drei Ereignisse mit bekannten Eintrittswahrscheinlichkeiten. Fehlende Quantile brechen diese Strategie ab. Ohne Einstellung bzw. mit `"p50"` bleibt die bisherige P50-Suche aktiv.
+
+P50 dient weiterhin als zentrale Referenz. Ein vorsorglicher Vorschlag kann bei P50 gegenüber keiner Zwangsladung mehr kosten; Bericht und Archiv weisen das aus. Kandidaten, PV-Erträge, Import, Export, Kosten und End-SOC je PV-Fall werden archiviert. Die Suche betrachtet höchstens vier Kandidaten und bewertet Restenergie nach Horizontende nicht. Das begrenzt die wirtschaftliche Aussagekraft; Forecast.Solar bleibt eine getrennte Vergleichsquelle.
+
+Die Fenstertabelle trennt den eingestellten Zielwert vom erwarteten SOC am Ende (P50). Bei einem niedrigen Ziel kann der SOC höher bleiben, während das Netz die Verbraucher versorgt. Ein hohes Ziel kann bei kurzem Fenster unerreicht bleiben. Die vorhandene Leistungsgrenze von 10 kW AC und angenommene Ladeeffizienz von 95 % erlauben bei 16 kWh höchstens 59,375 Prozentpunkte je Stunde. Das ist eine vorläufige Modellgrenze, keine neu gemessene Hardwarekalibrierung. Der beobachtete Zeitraum 22:30–00:00 umfasst 90 Minuten.

@@ -8,6 +8,7 @@ import { markdown, html } from './report.mjs';
 import { refreshProfiles } from './profiles.mjs';
 import { solarComparison } from './solar-comparison.mjs';
 import { scenarioId, suggestedScenario } from './decisions.mjs';
+import { recommendRisk } from './risk.mjs';
 
 export function plan(config, snapshot, demo = false) {
   config = { ...config, exportEurPerKwh: snapshot.exportTariff?.eurPerKwh ?? config.exportEurPerKwh };
@@ -17,6 +18,8 @@ export function plan(config, snapshot, demo = false) {
   number(snapshot.initialSoc, 'Hausbatterie-SOC', 0, 100);
   const prices = resample(awattar(snapshot.market, config.tariff), snapshot.start, snapshot.end, 'Strompreis');
   const pv = resample(solcast(snapshot.solar), snapshot.start, snapshot.end, 'PV');
+  if(config.pvStrategy!==undefined&&!['p50','price_risk'].includes(config.pvStrategy))throw Error('Unbekannte PV-Strategie');
+  const pvCases=config.pvStrategy==='price_risk'?[['P10','pv_estimate10'],['P50','pv_estimate'],['P90','pv_estimate90']].map(([name,field])=>({name,values:resample(solcast(snapshot.solar,field),snapshot.start,snapshot.end,name)})):null;
   const report = { demo, generatedAt: snapshot.generatedAt, start: snapshot.start, end: snapshot.end,
     defaultZoe: snapshot.defaultZoe, initialSoc: snapshot.initialSoc, exportTariff: snapshot.exportTariff ?? { eurPerKwh: config.exportEurPerKwh, source: 'Beispielkonfiguration' },
     warnings: [...(snapshot.warnings ?? []), ...(config.assumptions ?? [])], scenarios: [], pvComparison:solarComparison(config,snapshot) };
@@ -24,11 +27,13 @@ export function plan(config, snapshot, demo = false) {
     const name = `${withZoe ? 'Mit' : 'Ohne'} Zoe · ${withLaundry ? 'zwei zusätzliche Waschladungen' : 'ohne zusätzliche Wäsche'}`;
     try {
       const slots = makeSlots(config, snapshot, snapshot.start, snapshot.end, prices, pv, withZoe, withLaundry);
-      report.scenarios.push({ id:scenarioId({withZoe,withLaundry}), name, withZoe, withLaundry, plan: recommend(slots, config, snapshot.initialSoc) });
+      const result=pvCases?recommendRisk(pvCases.map(c=>({name:c.name,slots:slots.map((s,i)=>({...s,pvKwh:c.values[i]/4}))})),config,snapshot.initialSoc):recommend(slots, config, snapshot.initialSoc);
+      report.scenarios.push({ id:scenarioId({withZoe,withLaundry}), name, withZoe, withLaundry, plan: result });
     } catch (e) { report.scenarios.push({ id:scenarioId({withZoe,withLaundry}), name, withZoe, withLaundry, error: e.message }); }
   }
   report.warnings.push(`Wäsche-Szenario: zwei zusätzliche Ladungen, je ${config.laundry.cycleKwh ?? '?'} kWh und ${config.laundry.durationMinutes ?? '?'} Minuten. Vorläufige Annahme, nicht gemessen; bereits im Grundprofil enthaltene Wäsche bleibt enthalten.`);
   report.suggestedScenarioId=suggestedScenario(report);
+  if(pvCases)report.warnings.push('Preisrisiko-Abwägung über P10/P50/P90; zentrale Diagramme und Stromsalden zeigen P50. Ein Vorschlag kann dort Mehrkosten als Absicherung gegen andere PV-Verläufe haben. End-SOC außerhalb des Horizonts bleibt unbewertet; reale Kosten und Verluste können abweichen.');
   return report;
 }
 async function main() {

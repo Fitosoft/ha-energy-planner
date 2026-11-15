@@ -1,5 +1,5 @@
 name: PV- und Ladeplaner
-version: "0.3.1"
+version: "0.4.0"
 slug: ha_energy_planner
 description: Tägliche PV-, Batterie- und Zoe-Empfehlung mit Prognosearchiv und Ist-Vergleich
 url: https://github.com/Fitosoft/ha-energy-planner
