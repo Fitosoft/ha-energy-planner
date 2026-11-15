@@ -54,6 +54,11 @@ test('implemented windows are separate user declarations tied to the exact plann
   const input={kind:'implemented',scenarioId:'z1-w0',expectedRevision:1,confirmImplemented:true,windows:[{start:'2026-11-09T01:00',end:'2026-11-09T02:00',targetSoc:20}]};
   await assert.rejects(recordDecision(f.folder,f.manifest,f.report,f.config,{...input,confirmImplemented:false}),/ausdrücklich/);
   await assert.rejects(recordDecision(f.folder,f.manifest,f.report,f.config,{...input,windows:[{...input.windows[0],targetSoc:101}]}),/Ziel-SOC/);
+  await assert.rejects(recordDecision(f.folder,f.manifest,f.report,f.config,{...input,windows:[
+    {start:'2026-11-08T23:00',end:'2026-11-09T00:00',targetSoc:60},
+    {start:'2026-11-09T00:00',end:'2026-11-09T01:00',targetSoc:10},
+    {start:'2026-11-09T01:00',end:'2026-11-09T07:00',targetSoc:100}
+  ]}),/zwei Fenster insgesamt/);
   const implemented=await recordDecision(f.folder,f.manifest,f.report,f.config,input);
   assert.equal(implemented.plannedEventId,planned.id);assert.equal(implemented.windows[0].start,Date.parse('2026-11-09T00:00Z'));assert.match(implemented.evidence,/not_device_verified/);
   await recordDecision(f.folder,f.manifest,f.report,f.config,{kind:'planned',scenarioId:'z0-w1',expectedRevision:2});

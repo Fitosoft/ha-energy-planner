@@ -6,13 +6,14 @@ import { randomBytes, createHash } from 'node:crypto';
 import { collect } from './sources.mjs';
 import { plan } from './cli.mjs';
 import * as render from './report.mjs';
+import { MAX_CHARGE_WINDOWS } from './model.mjs';
 import { decisionContext, decisionPage, recordDecision, scenarioId } from './decisions.mjs';
 import { haRequest, websocketRequest, reportedState } from './ha.mjs';
 import { archiveRun, atomicJson, json, mergeStatistics, validateArchive } from './archive.mjs';
 import { learnProfiles } from './learning.mjs';
 import { localParts, midnight, label } from './time.mjs';
 
-export const VERSION = '0.3.0';
+export const VERSION = '0.3.1';
 export const DEFAULT_NOTIFICATIONS = {
   mobile: 'mobile_app_toms_iphone',
   alexa: ['notify.echo_badezimmer_durchsagen','notify.thomas_echo_show_8_durchsagen','notify.echo_schlafzimmer_durchsagen',
@@ -230,7 +231,8 @@ export async function startService(directory = '/data', { port = 8099, host = '0
         if(match[2]==='report.html'&&!download){
           const m=await json(join(folder,'manifest.json')),p=await json(join(folder,'plan.json')),c=await decisionContext(folder,p);
           const latest=await latestManifest(),zone=(await json(join(folder,'config.json'))).timeZone;
-          const banner=`<aside style="padding:20px;background:#fff3ce;color:#173a37;font:15px/1.5 system-ui"><b>Lauf ${escape(m.id)}</b> · Erstellt ${label(Date.parse(m.generatedAt),zone)} · Horizont ${label(m.start,zone)} – ${label(m.end,zone)}<br>${Date.now()>=m.end?'Planungshorizont abgelaufen. ':''}${latest?.id!==m.id?'Älterer Archivbericht. ':''}Geplante Variante: ${c.planned?escape(c.planned.scenarioId):'nicht bestätigt'} · Umsetzung: ${c.implemented?escape(c.implemented.scenarioId):'nicht angegeben'}<br><a href="review">Variante bestätigen / Umsetzung protokollieren</a> · <a href="report.html?download=1">Unveränderte Archivdatei herunterladen</a> · <a href="../../latest">Aktuellen gültigen Plan öffnen</a> · <a href="../../">Übersicht</a></aside>`;
+          const invalid=p.scenarios.some(s=>s.plan?.windows.length>MAX_CHARGE_WINDOWS);
+          const banner=`<aside style="padding:20px;background:#fff3ce;color:#173a37;font:15px/1.5 system-ui"><b>Lauf ${escape(m.id)}</b> · Erstellt ${label(Date.parse(m.generatedAt),zone)} · Horizont ${label(m.start,zone)} – ${label(m.end,zone)}<br>${invalid?'<b>Achtung: Dieser historische Bericht enthält nicht umsetzbare Varianten mit mehr als zwei Fenstern. Bitte neu berechnen.</b><br>':''}${Date.now()>=m.end?'Planungshorizont abgelaufen. ':''}${latest?.id!==m.id?'Älterer Archivbericht. ':''}Geplante Variante: ${c.planned?escape(c.planned.scenarioId):'nicht bestätigt'} · Umsetzung: ${c.implemented?escape(c.implemented.scenarioId):'nicht angegeben'}<br><a href="review">Variante bestätigen / Umsetzung protokollieren</a> · <a href="report.html?download=1">Unveränderte Archivdatei herunterladen</a> · <a href="../../latest">Aktuellen gültigen Plan öffnen</a> · <a href="../../">Übersicht</a></aside>`;
           data=data.toString().replace('<body>','<body>'+banner);
         }
         res.setHeader('Content-Type',match[2].endsWith('.html')?'text/html; charset=utf-8':match[2].endsWith('.json')?'application/json':'text/plain; charset=utf-8');res.end(data);return;

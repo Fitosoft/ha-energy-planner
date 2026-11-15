@@ -109,15 +109,15 @@ export function simulate(slots, battery, initialSoc, windows = [], exportPrice =
   }
   return { cost, importKwh, exportKwh, chargedKwh, dischargedKwh, finalSoc: stored / battery.capacityKwh * 100, trace };
 }
+export const MAX_CHARGE_WINDOWS = 2;
 export function validWindows(slots, windows, battery) {
-  const sorted = windows.toSorted((a, b) => a.start - b.start), counts = new Map();
+  if(windows.length>MAX_CHARGE_WINDOWS)return false;
+  const sorted = windows.toSorted((a, b) => a.start - b.start);
   for (let i = 0; i < sorted.length; i++) {
     const w = sorted[i], first = slots.find(s => s.start === w.start), last = slots.find(s => s.end === w.end);
     if (!first || !last || w.start >= w.end || first.date !== last.date || (i && sorted[i - 1].end > w.start)) return false;
     if (slots.some(s => s.start >= w.start && s.start < w.end && s.ambiguousClock)) return false;
     if (!Number.isFinite(w.targetSoc) || w.targetSoc < battery.minSoc || w.targetSoc > battery.maxSoc) return false;
-    counts.set(first.date, (counts.get(first.date) ?? 0) + 1);
-    if (counts.get(first.date) > 2) return false;
   }
   return true;
 }
@@ -128,7 +128,7 @@ export function recommend(slots, config, initialSoc) {
   let windows = [], best = baseline;
   const targets = [...new Set([...Array.from({ length: 10 }, (_, i) => (i + 1) * 10), b.maxSoc])].filter(x => x >= b.minSoc && x <= b.maxSoc);
   // shortcut: greedy window insertion and 10%-SOC grid; improve only when real comparisons justify it.
-  for (let iteration = 0; iteration < new Set(slots.map(s => s.date)).size * 2; iteration++) {
+  for (let iteration = 0; iteration < MAX_CHARGE_WINDOWS; iteration++) {
     let addition = null, candidateBest = best;
     for (let a = 0; a < slots.length; a++) for (let z = a; z < slots.length && slots[z].date === slots[a].date; z++) {
       const w = { start: slots[a].start, end: slots[z].end, targetSoc: b.maxSoc };
@@ -143,6 +143,6 @@ export function recommend(slots, config, initialSoc) {
     windows.push(addition); best = candidateBest;
   }
   windows.sort((a, b) => a.start - b.start);
-  return { method: 'Greedy-Vergleich, 15-Minuten-Fenster, Ziel-SOC in 10%-Schritten; kein globales Optimum garantiert',
+  return { method: 'Greedy-Vergleich, höchstens zwei Fenster insgesamt, 15-Minuten-Fenster, Ziel-SOC in 10%-Schritten; kein globales Optimum garantiert',
     baseline, windows, ...simulate(slots, b, initialSoc, windows, config.exportEurPerKwh, true), savings: baseline.cost - best.cost };
 }

@@ -57,12 +57,22 @@ test('battery reserve stops discharge and inefficient shifting is not free', () 
   const p = simulate([slot(0, 2)], { ...b, minSoc: 20 }, 20);
   assert.equal(p.importKwh, 2); assert.equal(p.finalSoc, 20);
 });
-test('no window crosses midnight, overlaps or exceeds two per day', () => {
+test('no window crosses midnight, overlaps or exceeds two in total', () => {
   const slots = Array.from({ length: 5 }, (_, i) => slot(i * STEP));
   slots[4].date = '2026-11-10';
   assert.equal(validWindows(slots, [{ start: 0, end: 5 * STEP, targetSoc: 50 }], b), false);
   assert.equal(validWindows(slots, [0,1,2].map(i => ({ start: i * STEP, end: (i+1) * STEP, targetSoc: 50 })), b), false);
   assert.equal(validWindows(slots, [{ start: 0, end: 2 * STEP, targetSoc: 50 }, { start: STEP, end: 3 * STEP, targetSoc: 50 }], b), false);
+});
+test('three windows spread over two dates still exceed the two device timers',()=>{
+  const slots=Array.from({length:12},(_,i)=>({...slot(i*STEP,i%4===0?0:.3,0,i%4===0?.01:.8),date:i<4?'2026-11-15':'2026-11-16'}));
+  const windows=[0,4,8].map(i=>({start:i*STEP,end:(i+1)*STEP,targetSoc:100}));
+  assert.equal(validWindows(slots,windows,b),false);
+  assert.equal(validWindows(slots,windows.slice(0,2),b),true);
+  const{config}=demo();config.battery={...config.battery,capacityKwh:1};
+  const result=recommend(slots,config,0);
+  assert.equal(result.windows.length,2);
+  assert.ok(validWindows(slots,result.windows,config.battery));
 });
 test('no forced charge is a valid result at flat prices', () => {
   const { config } = demo();

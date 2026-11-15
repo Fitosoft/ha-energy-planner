@@ -69,3 +69,7 @@ Details zu den vorläufigen Parametern: [Kalibrierung](docs/calibration.md).
 Nach einer fehlgeschlagenen Planung kann jederzeit mit oder ohne Handy-/Alexa-Meldung neu gerechnet werden. Der Link zum aktuellen gültigen Plan wird aus den abgeschlossenen Archivläufen ermittelt. Der Berichtskopf zeigt Lauf, Zeitraum und Bestätigungsstatus.
 
 Über **Variante bestätigen / Umsetzung** wird die geplante Variante ausdrücklich gespeichert. Die tatsächlich manuell am Wechselrichter gesetzten Fenster und Ziel-SOC-Werte werden danach separat protokolliert. Änderungen bleiben als zusätzliche Ereignisse erhalten und gelten nur für den konkreten Lauf; sie werden nicht auf neu gerechnete Pläne übertragen. Es findet keine Gerätesteuerung statt. Details und Sicherungskonzept: [Korrekturen und Auswahlhistorie](docs/0.3.0-fixes.md).
+
+## Korrektur 0.3.1: Zwei Gerätefenster insgesamt
+
+Der Plan darf höchstens zwei unterschiedliche Batterie-Zeit-/SOC-Fenster über den gesamten Planungshorizont enthalten, auch wenn dieser zwei Kalendertage berührt. Bis 0.3.0 war die Begrenzung fälschlich je Kalendertag umgesetzt. Die Suche und die manuelle Umsetzungserfassung verwenden jetzt dieselbe globale Grenze. Frühere Archivberichte bleiben unverändert; enthält ein alter Bericht mehr als zwei Fenster, warnt die Ansicht davor und verlangt vor einer neuen Planbestätigung eine Neuberechnung.

@@ -1,3 +1,10 @@
+# 0.3.1
+
+- Fehler behoben: höchstens zwei Batterie-Zeit-/SOC-Fenster insgesamt pro Planlauf statt je Kalendertag.
+- Gleiche globale Grenze bei manuellen Umsetzungsmeldungen; alte unzulässige Vorschläge sind nicht neu bestätigbar.
+- Unveränderte Archivberichte mit unzulässigen Varianten erhalten einen Warnhinweis.
+- Regressionstest für drei über Mitternacht verteilte Fenster.
+
 # 0.3.0
 
 - Frischeprüfung des Hausbatterie-SOC über den live gelesenen HA-Meldezeitpunkt. Unveränderte 0 % bleiben gültig; ungültige, alte und echte Zukunftswerte werden getrennt erkannt.

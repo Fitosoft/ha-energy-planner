@@ -45,7 +45,7 @@ keine Nullwerte für fehlende Daten. Der HA-Raw-Sensor wird zum Vergleich dokume
 - Im Zwangslademodus wird nicht entladen, auch nach Ziel-SOC. PV deckt im Modell
   zuerst die Last; diese Annahme ist am konkreten Wechselrichter noch zu bestätigen.
 - PV-Überschuss darf die Batterie auch über den Zwangslade-Zielwert hinaus laden.
-- Höchstens zwei Fenster pro lokalem Kalendertag, keine Überschreitung von Mitternacht.
+- Höchstens zwei Fenster insgesamt pro Planlauf über den gesamten Planungshorizont; kein einzelnes Fenster überschreitet Mitternacht.
 - Suche fügt kostenverbessernde Fenster hinzu, Ziel-SOC in 10%-Schritten.
   Sie ist eine Heuristik, kein Nachweis eines globalen Optimums.
 - Jede Variante wird mit ihrer eigenen Variante ohne Zwangsladung verglichen.
