@@ -1,3 +1,9 @@
+# 0.4.1
+
+- Preisrisiko-Suche prüft auch mittlere Ziel-SOC-Kombinationen und das Weglassen einzelner Fenster, statt nur drei fertige PV-Vorschläge und keine Zwangsladung zu vergleichen.
+- Regressionstest für einen wirtschaftlich besseren Kompromiss zwischen Vorladung und späterem Netzbezug. Globale Zwei-Fenster-Grenze und Energieflussmodell bleiben unverändert.
+- Bericht nennt Kandidatenanzahl und erklärt, dass die wirtschaftliche Risikoabwägung Netzbezug bei P50 bewusst zulassen kann.
+
 # 0.4.0
 
 - Preisrisiko-Abwägung über Solcast P10/P50/P90 einschließlich Bezugspreisen, Einspeisevergütung und Ladeverlusten; keine pauschale pessimistische PV-Annahme.

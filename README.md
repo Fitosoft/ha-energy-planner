@@ -1,6 +1,6 @@
 # Home Assistant Energy Planner
 
-Lokaler Empfehlungsplaner für PV, Hausbatterie und Elektroauto. **Version 0.4.0** läuft als Home-Assistant-App oder über die Kommandozeile. Node.js >=22, ausschließlich Standardbibliothek. Der Planer schaltet keine Geräte und setzt keine Wechselrichter-Timer; die Umsetzung bleibt manuell.
+Lokaler Empfehlungsplaner für PV, Hausbatterie und Elektroauto. **Version 0.4.1** läuft als Home-Assistant-App oder über die Kommandozeile. Node.js >=22, ausschließlich Standardbibliothek. Der Planer schaltet keine Geräte und setzt keine Wechselrichter-Timer; die Umsetzung bleibt manuell.
 
 ## Funktionsumfang
 
@@ -8,7 +8,7 @@ Lokaler Empfehlungsplaner für PV, Hausbatterie und Elektroauto. **Version 0.4.0
 - Vier Verbrauchsvarianten: Zoe ja/nein und zwei zusätzliche Waschladungen ja/nein. Zoe, Wäsche und Legionellenprogramm werden zeitlich getrennt berücksichtigt.
 - Höchstens zwei Batterie-Zeit-/SOC-Fenster insgesamt pro Planlauf; kein einzelnes Fenster überschreitet Mitternacht.
 - Bezugspreise aus aWATTar samt konfigurierten Aufschlägen und Einspeisetarif aus HA Energy.
-- Wirtschaftlicher PV-Risikovergleich mit Solcast P10/P50/P90 bei `pvStrategy: "price_risk"` (in der Beispielkonfiguration aktiviert). Unter den drei heuristischen Vorschlägen und keiner Zwangsladung wird die größte vermeidbare Kostenabweichung minimiert. P50 bleibt Referenz für zentrale Diagramme und Salden; eine Absicherung kann bei P50 mehr kosten. Ohne diese Einstellung bzw. mit `"p50"` bleibt die P50-Suche verfügbar.
+- Wirtschaftlicher PV-Risikovergleich mit Solcast P10/P50/P90 bei `pvStrategy: "price_risk"` (in der Beispielkonfiguration aktiviert). Unter den drei heuristischen Vorschlägen mit variierten Zielwerten, Weglassen einzelner Fenster und keiner Zwangsladung wird die größte vermeidbare Kostenabweichung minimiert. P50 bleibt Referenz für zentrale Diagramme und Salden; eine Absicherung kann bei P50 mehr kosten. Ohne diese Einstellung bzw. mit `"p50"` bleibt die P50-Suche verfügbar.
 - Forecast.Solar optional als getrennte Vergleichsquelle aus dem vorhandenen HA-Cache.
 - HTML-/Markdown-Berichte mit Ziel-SOC und erwartetem SOC am Fensterende. Während eines Zwangsladefensters bleibt die Batterieentladung im Modell gesperrt, auch wenn der vorhandene SOC schon über dem Ziel liegt.
 - HA Ingress, Handy-Benachrichtigung und Alexa-Durchsage; manuelle Neuberechnung wahlweise mit oder ohne Benachrichtigung.
@@ -30,7 +30,7 @@ Der Demo-Bericht liegt anschließend in `output/`. Für reale Eingaben: [Lokale 
 
 ## Grenzen und Nachvollziehbarkeit
 
-Die Ladefenstersuche ist heuristisch, mit 15-Minuten-Fenstern und einem 10-Prozentpunkte-Raster für Zielwerte. Der PV-Risikovergleich prüft höchstens vier Kandidaten; er unterstellt keine Eintrittswahrscheinlichkeiten und garantiert kein globales Optimum. Restenergie nach Horizontende wird nicht monetär bewertet. Die Ergebnisse sind Modellrechnungen, kein Nachweis tatsächlich erzielter Ersparnisse.
+Die Ladefenstersuche ist heuristisch, mit 15-Minuten-Fenstern und einem 10-Prozentpunkte-Raster für Zielwerte. Der PV-Risikovergleich variiert Zielwerte an den Zeitgrenzen der drei PV-Vorschläge; er unterstellt keine Eintrittswahrscheinlichkeiten und garantiert kein globales Optimum. Restenergie nach Horizontende wird nicht monetär bewertet. Die Ergebnisse sind Modellrechnungen, kein Nachweis tatsächlich erzielter Ersparnisse.
 
 Kapazität, AC-Leistungsgrenzen und Wirkungsgrade der Batterie sowie Waschenergie sind teilweise vorläufig. Zeitliche Trennung ersetzt keine technische Verriegelung des gemeinsamen Stromkreises. Fehlende oder veraltete Daten bleiben Fehler bzw. ausgewiesene Lücken; ein frisch gemeldeter SOC von 0 % ist gültig.
 

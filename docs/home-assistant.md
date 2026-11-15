@@ -45,7 +45,7 @@ keine Nullwerte für fehlende Daten. Der HA-Raw-Sensor wird zum Vergleich dokume
 - PV-Überschuss darf die Batterie auch über den Zwangslade-Zielwert hinaus laden.
 - Höchstens zwei Fenster insgesamt pro Planlauf über den gesamten Planungshorizont; kein einzelnes Fenster überschreitet Mitternacht.
 - Die Suche je PV-Fall fügt kostenverbessernde Fenster hinzu, Ziel-SOC in 10%-Schritten.
-  `price_risk` bewertet danach diese drei Vorschläge und keine Zwangsladung über alle PV-Fälle.
+  `price_risk` bewertet danach diese Zeitfenster mit variierten Zielwerten und Weglassen einzelner Fenster sowie keine Zwangsladung über alle PV-Fälle.
   Der gewählte Vorschlag kann bei P50 mehr kosten; kein globales Optimum wird garantiert.
 - Ziel-SOC und erwarteter End-SOC sind getrennt: Leistung und Dauer können die Zielerreichung
   begrenzen; ein höherer vorhandener SOC wird durch einen niedrigen Zielwert nicht abgesenkt.

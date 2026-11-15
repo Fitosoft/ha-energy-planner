@@ -13,7 +13,7 @@ import { archiveRun, atomicJson, json, mergeStatistics, validateArchive } from '
 import { learnProfiles } from './learning.mjs';
 import { localParts, midnight, label } from './time.mjs';
 
-export const VERSION = '0.4.0';
+export const VERSION = '0.4.1';
 export const DEFAULT_NOTIFICATIONS = {
   mobile: 'mobile_app_toms_iphone',
   alexa: ['notify.echo_badezimmer_durchsagen','notify.thomas_echo_show_8_durchsagen','notify.echo_schlafzimmer_durchsagen',

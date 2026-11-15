@@ -13,10 +13,16 @@ function fixture(feed){
   const cases=['P10','P50','P90'].map((name,i)=>({name,slots:slots.map((s,n)=>({...s,pvKwh:n===1&&i===2?2:0}))}));
   return{config,cases};
 }
+
+test('PV risk search evaluates intermediate targets instead of choosing only extreme proposals',()=>{
+  const {config,cases}=fixture(.05),p=recommendRisk(cases,config,0);
+  assert.deepEqual(p.windows.map(w=>w.targetSoc),[40]);
+  assert.ok(Math.abs(p.risk.maxExtraCostEur-.12)<1e-9);
+});
 test('lower feed-in tariff can favor less grid charging under the same PV uncertainty',()=>{
   const low=fixture(.05),high=fixture(.25);
   const a=recommendRisk(low.cases,low.config,0),b=recommendRisk(high.cases,high.config,0);
-  assert.equal(a.windows.length,0);assert.ok(b.windows.length>0);
+  assert.deepEqual(a.windows.map(w=>w.targetSoc),[40]);assert.deepEqual(b.windows.map(w=>w.targetSoc),[80]);
   assert.ok(b.chargedKwh>a.chargedKwh);
   for(const[c,p]of [[low,a],[high,b]]){
     assert.ok(validWindows(c.cases[1].slots,p.windows,c.config.battery));
