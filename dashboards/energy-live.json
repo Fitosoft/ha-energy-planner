@@ -1,0 +1,249 @@
+{
+  "title": "Energie live",
+  "views": [
+    {
+      "title": "Energie",
+      "path": "energie",
+      "icon": "mdi:lightning-bolt",
+      "type": "panel",
+      "cards": [
+        {
+          "type": "vertical-stack",
+          "cards": [
+            {
+              "type": "entities",
+              "title": "Aktuell",
+              "show_header_toggle": false,
+              "entities": [
+                {
+                  "entity": "sensor.awattar_full_price_gross_estimated",
+                  "name": "Bezugspreis inkl. Aufschläge"
+                },
+                {
+                  "entity": "sensor.sungrow_battery_level",
+                  "name": "Hausbatterie"
+                },
+                {
+                  "entity": "sensor.sungrow_load_power",
+                  "name": "Hausverbrauch"
+                },
+                {
+                  "entity": "sensor.sungrow_pv_power",
+                  "name": "PV-Leistung"
+                }
+              ]
+            },
+            {
+              "type": "custom:apexcharts-card",
+              "header": {
+                "show": true,
+                "title": "Strompreis · verfügbare kommende Stunden",
+                "show_states": false
+              },
+              "graph_span": "36h",
+              "span": {
+                "start": "hour"
+              },
+              "now": {
+                "show": true,
+                "label": "Jetzt"
+              },
+              "yaxis": [
+                {
+                  "decimals": 1,
+                  "apex_config": {
+                    "title": {
+                      "text": "ct/kWh"
+                    }
+                  }
+                }
+              ],
+              "series": [
+                {
+                  "entity": "sensor.awattar_marketdata_raw",
+                  "name": "Bezug inkl. Aufschläge",
+                  "unit": "ct/kWh",
+                  "float_precision": 2,
+                  "type": "line",
+                  "curve": "stepline",
+                  "stroke_width": 3,
+                  "color": "#d28b08",
+                  "extend_to": false,
+                  "data_generator": "const rows=(entity.attributes.data||[]).filter(r=>Number.isFinite(r.start_timestamp)&&Number.isFinite(r.end_timestamp)&&Number.isFinite(r.marketprice)&&r.end_timestamp>r.start_timestamp).sort((a,b)=>a.start_timestamp-b.start_timestamp); return rows.flatMap(r=>[[r.start_timestamp,r.marketprice*0.12+11.96],[r.end_timestamp-1,r.marketprice*0.12+11.96],[r.end_timestamp,null]]);"
+                }
+              ],
+              "apex_config": {
+                "chart": {
+                  "height": 300
+                },
+                "tooltip": {
+                  "x": {
+                    "format": "dd.MM. HH:mm"
+                  }
+                }
+              }
+            },
+            {
+              "type": "custom:apexcharts-card",
+              "header": {
+                "show": true,
+                "title": "Leistung und Batterie-SoC · letzte 24 Stunden"
+              },
+              "graph_span": "24h",
+              "yaxis": [
+                {
+                  "id": "power",
+                  "min": 0,
+                  "decimals": 1,
+                  "apex_config": {
+                    "title": {
+                      "text": "Leistung · kW"
+                    }
+                  }
+                },
+                {
+                  "id": "soc",
+                  "opposite": true,
+                  "min": 0,
+                  "max": 100,
+                  "decimals": 0,
+                  "apex_config": {
+                    "title": {
+                      "text": "SoC · %"
+                    }
+                  }
+                }
+              ],
+              "series": [
+                {
+                  "entity": "sensor.sungrow_pv_power",
+                  "name": "PV",
+                  "color": "#e6a817",
+                  "yaxis_id": "power",
+                  "unit": "kW",
+                  "transform": "return x === null ? null : x / 1000;",
+                  "float_precision": 2,
+                  "stroke_width": 2,
+                  "extend_to": false,
+                  "group_by": {
+                    "func": "avg",
+                    "duration": "5min",
+                    "fill": "null"
+                  }
+                },
+                {
+                  "entity": "sensor.sungrow_load_power",
+                  "name": "Hausverbrauch",
+                  "color": "#147d75",
+                  "yaxis_id": "power",
+                  "unit": "kW",
+                  "transform": "return x === null ? null : x / 1000;",
+                  "float_precision": 2,
+                  "stroke_width": 2,
+                  "extend_to": false,
+                  "group_by": {
+                    "func": "avg",
+                    "duration": "5min",
+                    "fill": "null"
+                  }
+                },
+                {
+                  "entity": "sensor.sungrow_grid_import_power",
+                  "name": "Netzbezug",
+                  "color": "#d65a4a",
+                  "yaxis_id": "power",
+                  "unit": "kW",
+                  "transform": "return x === null ? null : x / 1000;",
+                  "float_precision": 2,
+                  "stroke_width": 2,
+                  "extend_to": false,
+                  "group_by": {
+                    "func": "avg",
+                    "duration": "5min",
+                    "fill": "null"
+                  }
+                },
+                {
+                  "entity": "sensor.sungrow_grid_export_power",
+                  "name": "Einspeisung",
+                  "color": "#7c66b5",
+                  "yaxis_id": "power",
+                  "unit": "kW",
+                  "transform": "return x === null ? null : x / 1000;",
+                  "float_precision": 2,
+                  "stroke_width": 2,
+                  "extend_to": false,
+                  "group_by": {
+                    "func": "avg",
+                    "duration": "5min",
+                    "fill": "null"
+                  }
+                },
+                {
+                  "entity": "sensor.sungrow_battery_charge_power",
+                  "name": "Batterie lädt",
+                  "color": "#65a657",
+                  "yaxis_id": "power",
+                  "unit": "kW",
+                  "transform": "return x === null ? null : x / 1000;",
+                  "float_precision": 2,
+                  "stroke_width": 2,
+                  "extend_to": false,
+                  "group_by": {
+                    "func": "avg",
+                    "duration": "5min",
+                    "fill": "null"
+                  }
+                },
+                {
+                  "entity": "sensor.sungrow_battery_discharge_power",
+                  "name": "Batterie entlädt",
+                  "color": "#c38638",
+                  "yaxis_id": "power",
+                  "unit": "kW",
+                  "transform": "return x === null ? null : x / 1000;",
+                  "float_precision": 2,
+                  "stroke_width": 2,
+                  "extend_to": false,
+                  "group_by": {
+                    "func": "avg",
+                    "duration": "5min",
+                    "fill": "null"
+                  }
+                },
+                {
+                  "entity": "sensor.sungrow_battery_level",
+                  "name": "Batterie-SoC",
+                  "unit": "%",
+                  "yaxis_id": "soc",
+                  "color": "#3267c8",
+                  "stroke_width": 3,
+                  "extend_to": false,
+                  "group_by": {
+                    "func": "last",
+                    "duration": "5min",
+                    "fill": "null"
+                  }
+                }
+              ],
+              "apex_config": {
+                "chart": {
+                  "height": 390
+                },
+                "tooltip": {
+                  "x": {
+                    "format": "dd.MM. HH:mm"
+                  }
+                }
+              }
+            },
+            {
+              "type": "markdown",
+              "content": "Preise aus aWATTar: Börsenpreis × 1,20 + 0,1196 EUR/kWh. Nur veröffentlichte Stunden werden gezeigt. Keine separate Tado-Preisquelle angebunden. Leistung links in kW, Batterie-SoC rechts in %. Die Leistungskurven zeigen 5-Minuten-Mittelwerte; SoC den letzten Wert je Intervall. Über die Legende lassen sich Kurven ausblenden. [PV- und Ladeplaner öffnen](/local_ha_energy_planner)"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
