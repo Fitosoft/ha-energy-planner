@@ -34,7 +34,7 @@ export async function learnProfiles(directory,config,loadEntity,now=Date.now()) 
     if(!hist)continue;
     rows.push(...eligibleHours(await json(join(directory,'actual',name)),hist.history,config,loadEntity));
   }
-  const result=refreshProfiles(rows,now,config.profiles,config.timeZone);
+  const result=refreshProfiles(rows,now,config.profiles,config.timeZone,config.temporaryLoads);
   result.eligibility='Nur vollständige Stunden mit explizit ausgeschaltetem Zoe-Ladestatus; gepuffertes Legionellenfenster ausgeschlossen. Normale Wäsche bleibt im Grundprofil.';
   const id=result.generatedAt.replace(/[:.]/g,'-');
   await atomicJson(join(directory,'profiles',`${id}.json`),result);

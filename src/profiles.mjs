@@ -1,8 +1,11 @@
+import { temporaryEnergy } from './temporary-loads.mjs';
 import { localParts } from './time.mjs';
 import { number, timestamp } from './inputs.mjs';
 
 // Input rows must be explicitly approved as base load, not merely missing Zoe status.
-export function refreshProfiles(rows, now, previous, zone = 'Europe/Vienna') {
+export function refreshProfiles(rows, now, previous, zone = 'Europe/Vienna', temporaryLoads = []) {
+  temporaryEnergy(temporaryLoads,now,now);
+  let excludedTemporaryHours=0;
   const maxAge = 42 * 86_400_000;
   const buckets = Object.fromEntries(['weekday','saturday','sunday'].map(k => [k, Array.from({ length: 24 }, () => [])]));
   const seen = new Set();
@@ -12,6 +15,7 @@ export function refreshProfiles(rows, now, previous, zone = 'Europe/Vienna') {
     if (age < 0 || age > maxAge) continue;
     if (seen.has(t)) throw Error('Doppelter Profilzeitpunkt');
     seen.add(t);
+    if(temporaryEnergy(temporaryLoads,t,t+3600000)>0){excludedTemporaryHours++;continue;}
     const p = localParts(t, zone);
     if (p.minute % 60 || t % 3_600_000) throw Error('Profil benötigt vollständige Stundenwerte');
     const day = new Date(`${p.date}T12:00Z`).getUTCDay();
@@ -29,5 +33,5 @@ export function refreshProfiles(rows, now, previous, zone = 'Europe/Vienna') {
       return a.reduce((n, x) => n + x.value * x.weight, 0) / a.reduce((n, x) => n + x.weight, 0);
     });
   }
-  return { profiles, counts, warnings, generatedAt: new Date(now).toISOString(), lookbackDays: 42, halfLifeDays: 14 };
+  return { profiles, counts, warnings, temporaryLoads, excludedTemporaryHours, generatedAt: new Date(now).toISOString(), lookbackDays: 42, halfLifeDays: 14 };
 }

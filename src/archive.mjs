@@ -35,7 +35,7 @@ export async function archiveRun(directory, snapshot, config, report, render, ve
   await writeFile(join(folder, 'report.md'), render.markdown(report, config));
   await writeFile(join(folder, 'forecast.csv'), csv(report.scenarios.flatMap((s, scenario) => (s.plan?.trace ?? []).map(t => ({
     scenario, scenarioId:s.id??scenarioId(s), withZoe: s.withZoe, withLaundry: s.withLaundry, start: new Date(t.start).toISOString(), end: new Date(t.end).toISOString(),
-    baseKwh: t.baseKwh, zoeKwh: t.zoeKwh, laundryKwh: t.laundryKwh, legionellaKwh: t.legionellaKwh,
+    baseKwh: t.baseKwh, temporaryKwh: t.temporaryKwh ?? 0, zoeKwh: t.zoeKwh, laundryKwh: t.laundryKwh, legionellaKwh: t.legionellaKwh,
     loadKwh: t.loadKwh, pvKwh: t.pvKwh, priceEurPerKwh: t.price, importKwh: t.importKwh, exportKwh: t.exportKwh,
     chargeKwh: t.chargeKwh, dischargeKwh: t.dischargeKwh, soc: t.soc, forced: t.forced, targetSoc: t.targetSoc
   })))));

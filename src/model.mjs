@@ -1,3 +1,4 @@
+import { temporaryEnergy } from './temporary-loads.mjs';
 import { STEP, localParts, clockMinutes, overlapMinutes } from './time.mjs';
 import { number } from './inputs.mjs';
 
@@ -34,6 +35,7 @@ export function makeSlots(config, snapshot, start, end, prices, pv, withZoe, wit
     const profileKey = weekday === 0 ? 'sunday' : weekday === 6 ? 'saturday' : 'weekday';
     const profile = config.profiles[profileKey];
     if (!Array.isArray(profile) || profile.length !== 24) throw Error(`24 Profilwerte für ${profileKey} fehlen`);
+    const temporaryKwh = temporaryEnergy(config.temporaryLoads,t,t+STEP);
     const baseKwh = number(profile[Math.floor(minute / 60)], 'Hausprofil kW', 0) / 4;
     const legionella = weekday === config.legionella.weekday;
     const programStart = clockMinutes(config.legionella.start);
@@ -46,9 +48,9 @@ export function makeSlots(config, snapshot, start, end, prices, pv, withZoe, wit
     zoeRemaining -= zoeKwh;
     // Conservative shared-circuit rule: do not combine any of the three loads.
     if ((zoeKwh > 0 && legionellaKwh > 0) || (laundryKwh > 0 && (zoeKwh > 0 || legionellaKwh > 0))) throw Error('Szenario verletzt die zeitliche Trennung am gemeinsamen Stromkreis');
-    slots.push({ start: t, end: t + STEP, date, minute, baseKwh, zoeKwh, legionellaKwh, laundryKwh,
+    slots.push({ start: t, end: t + STEP, date, minute, baseKwh, temporaryKwh, zoeKwh, legionellaKwh, laundryKwh,
       applianceBlocked: zoeMinutes > 0 || (legionella && windowOverlap(minute, config.legionella.blockedWindows ?? [[config.legionella.start, config.legionella.end]]) > 0),
-      loadKwh: baseKwh + zoeKwh + legionellaKwh + laundryKwh,
+      loadKwh: temporaryKwh + baseKwh + zoeKwh + legionellaKwh + laundryKwh,
       pvKwh: number(pv[i], 'PV kW', 0) / 4, price: number(prices[i], 'Preis EUR/kWh') });
   }
   const localCounts = new Map();

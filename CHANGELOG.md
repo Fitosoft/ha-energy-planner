@@ -1,3 +1,9 @@
+# 0.5.0
+
+- Zeitlich begrenzte Zusatzlasten separat planen und archivieren.
+- Betroffene Stunden bei automatischer und manueller Profilpflege ausschließen, auch nach erfasstem Ende.
+- Keine dauerhafte Übernahme geschätzter Sonderlasten in das Hausprofil.
+
 # 0.4.1
 
 - Preisrisiko-Suche prüft auch mittlere Ziel-SOC-Kombinationen und das Weglassen einzelner Fenster, statt nur drei fertige PV-Vorschläge und keine Zwangsladung zu vergleichen.

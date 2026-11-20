@@ -34,9 +34,9 @@ export function markdown(report, config) {
     lines.push(`## ${scenario.name}`, '');
     if (scenario.error) { lines.push(`Nicht berechnet: ${scenario.error}`, ''); continue; }
     const p = scenario.plan;
-    const total = key => p.trace.reduce((n, s) => n + s[key], 0);
+    const total = key => p.trace.reduce((n, s) => n + (s[key] ?? 0), 0);
     lines.push('| Energie im Planungshorizont | kWh |', '|---|---:|',
-      `| Hausprofil | ${f(total('baseKwh'))} |`, `| Zoe zusätzlich | ${f(total('zoeKwh'))} |`,
+      `| Hausprofil | ${f(total('baseKwh'))} |`, `| Temporäre Zusatzlasten | ${f(total('temporaryKwh'))} |`, `| Zoe zusätzlich | ${f(total('zoeKwh'))} |`,
       `| Legionellenprogramm zusätzlich | ${f(total('legionellaKwh'))} |`,
       `| Zusätzliche Wäsche | ${f(total('laundryKwh'))} |`, `| PV-Prognose | ${f(total('pvKwh'))} |`, '');
     lines.push(`Kosten ohne Zwangsladung (P50): **${f(p.baseline.cost)} €**. Mit Vorschlag: **${f(p.cost)} €**. ${p.risk?'Saldo-Unterschied bei P50':'Modellvorteil'}: **${f(p.savings)} €**.`, '',
@@ -110,7 +110,7 @@ export function html(report, config) {
       <div class="columns"><div><h3>Vorgeschlagene Batteriefenster</h3>${windows}<p class="notice">${escape(windowExplanation(p))}</p><p class="muted">Während des gesamten Fensters bleibt die Batterieentladung im Modell gesperrt – auch nach Erreichen des Ziel-SOC. Ein bereits höherer SOC wird nicht auf den Zielwert abgesenkt; PV kann ihn weiter erhöhen. Die Spalte „Modell-SOC am Ende“ zeigt den erwarteten Füllstand unabhängig vom eingestellten Ziel.</p>
       <h3>Verbraucher im Tagesplan</h3><dl><dt>Zoe</dt><dd>${schedule(t,'zoeKwh',config.timeZone)}</dd><dt>Zusätzliche Wäsche</dt><dd>${schedule(t,'laundryKwh',config.timeZone)}</dd><dt>Legionellenprogramm</dt><dd>${schedule(t,'legionellaKwh',config.timeZone)}</dd></dl><p class="muted">Anzeige auf Viertelstunden gerundet; die Energierechnung berücksichtigt Zoe-Fenster minutengenau. Wäsche ist ein Vorschlag zur manuellen Durchführung. Das ganze Zoe-Timerfenster bleibt für Wäsche gesperrt, auch bei prognostiziert früherem Ladeende.</p></div>
       <div><h3>Energie und Kosten</h3><table><tbody>${[
-        ['Hausprofil',`${f(total(t,'baseKwh'))} kWh`],['Zoe zusätzlich',`${f(total(t,'zoeKwh'))} kWh`],['Zusätzliche Wäsche',`${f(total(t,'laundryKwh'))} kWh`],
+        ['Hausprofil',`${f(total(t,'baseKwh'))} kWh`],['Temporäre Zusatzlasten',`${f(total(t,'temporaryKwh'))} kWh`],['Zoe zusätzlich',`${f(total(t,'zoeKwh'))} kWh`],['Zusätzliche Wäsche',`${f(total(t,'laundryKwh'))} kWh`],
         ['Legionellenprogramm zusätzlich',`${f(total(t,'legionellaKwh'))} kWh`],['PV-Prognose',`${f(total(t,'pvKwh'))} kWh`],
         ['Netzbezug / Einspeisung',`${f(p.importKwh)} / ${f(p.exportKwh)} kWh`],['End-SOC mit / ohne Zwangsladung',`${f(p.finalSoc,1)} / ${f(p.baseline.finalSoc,1)} %`],
         ['Kosten ohne Zwangsladung',`${f(p.baseline.cost)} €`],['Kosten mit Vorschlag',`${f(p.cost)} €`],[p.risk?'Saldo-Unterschied bei P50':'Modellvorteil',`${f(p.savings)} €`]

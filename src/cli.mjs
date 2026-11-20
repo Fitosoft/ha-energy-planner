@@ -32,6 +32,7 @@ export function plan(config, snapshot, demo = false) {
     } catch (e) { report.scenarios.push({ id:scenarioId({withZoe,withLaundry}), name, withZoe, withLaundry, error: e.message }); }
   }
   report.warnings.push(`Wäsche-Szenario: zwei zusätzliche Ladungen, je ${config.laundry.cycleKwh ?? '?'} kWh und ${config.laundry.durationMinutes ?? '?'} Minuten. Vorläufige Annahme, nicht gemessen; bereits im Grundprofil enthaltene Wäsche bleibt enthalten.`);
+  if(config.temporaryLoads?.length)report.warnings.push('Temporäre Zusatzlasten sind separat eingerechnet; betroffene Stunden werden beim Profil-Lernen ausgeschlossen. Offene Endzeit gilt bis zur ausdrücklich erfassten Beendigung.');
   report.suggestedScenarioId=suggestedScenario(report);
   if(pvCases)report.warnings.push('Preisrisiko-Abwägung über P10/P50/P90; zentrale Diagramme und Stromsalden zeigen P50. Ein Vorschlag kann dort Mehrkosten als Absicherung gegen andere PV-Verläufe haben. End-SOC außerhalb des Horizonts bleibt unbewertet; reale Kosten und Verluste können abweichen.');
   return report;
@@ -42,7 +43,7 @@ async function main() {
   if (command === 'profiles') {
     const config = JSON.parse(await readFile(configFile, 'utf8'));
     const history = JSON.parse(await readFile(inputFile ?? 'local/profile-history.json', 'utf8'));
-    const result = refreshProfiles(history, Date.now(), config.profiles, config.timeZone);
+    const result = refreshProfiles(history, Date.now(), config.profiles, config.timeZone, config.temporaryLoads);
     await mkdir('output', { recursive: true });
     const prefix = `output/profile-${result.generatedAt.replace(/[:.]/g, '-')}`;
     await writeFile(`${prefix}.json`, JSON.stringify(result, null, 2));
