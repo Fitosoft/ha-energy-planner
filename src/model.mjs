@@ -83,6 +83,8 @@ export function simulate(slots, battery, initialSoc, windows = [], exportPrice =
   const min = battery.capacityKwh * battery.minSoc / 100, max = battery.capacityKwh * battery.maxSoc / 100;
   let cost = 0, importKwh = 0, exportKwh = 0, chargedKwh = 0, dischargedKwh = 0;
   const trace = [];
+  let pvHoldViolation=false;
+  const reserveEnds=new Map();
   for (const s of slots) {
     const w = windows.find(w => w.start <= s.start && w.end > s.start);
     const net = s.pvKwh - s.loadKwh;
@@ -92,8 +94,9 @@ export function simulate(slots, battery, initialSoc, windows = [], exportPrice =
       // PV serves load first; forced mode prevents battery discharge even after target.
       const target = Math.min(max, battery.capacityKwh * w.targetSoc / 100);
       const forced = Math.min(battery.chargeKw / 4, Math.max(0, target - stored) / battery.chargeEfficiency);
-      const solar = Math.min(battery.chargeKw / 4, pvSurplus, Math.max(0, max - stored) / battery.chargeEfficiency);
-      charge = Math.max(forced, solar);
+      if(!reserveEnds.has(w)){const deficit=Math.max(0,target-stored);const slowHours=(deficit+battery.capacityKwh*.05)/(battery.chargeKw*.8*battery.chargeEfficiency);reserveEnds.set(w,s.start+Math.ceil(slowHours*3600000/STEP)*STEP+STEP);}
+      if(stored>=target-1e-8&&s.pvKwh*4>=.1&&s.start>=reserveEnds.get(w))pvHoldViolation=true;
+      charge = forced;
       imported = Math.max(-net, 0) + Math.max(charge - pvSurplus, 0);
       exported = Math.max(pvSurplus - charge, 0);
     } else if (net >= 0) {
@@ -109,7 +112,7 @@ export function simulate(slots, battery, initialSoc, windows = [], exportPrice =
     if (detail) trace.push({ ...s, forced: !!w, targetSoc: w?.targetSoc ?? null, importKwh: imported, exportKwh: exported,
       chargeKwh: charge, dischargeKwh: discharge, soc: stored / battery.capacityKwh * 100 });
   }
-  return { cost, importKwh, exportKwh, chargedKwh, dischargedKwh, finalSoc: stored / battery.capacityKwh * 100, trace };
+  return { pvHoldViolation, cost, importKwh, exportKwh, chargedKwh, dischargedKwh, finalSoc: stored / battery.capacityKwh * 100, trace };
 }
 export const MAX_CHARGE_WINDOWS = 2;
 export function validWindows(slots, windows, battery) {
@@ -138,7 +141,7 @@ export function recommend(slots, config, initialSoc) {
       for (const targetSoc of targets) {
         w.targetSoc = targetSoc;
         const candidate = simulate(slots, b, initialSoc, [...windows, w], config.exportEurPerKwh);
-        if (candidate.cost < candidateBest.cost - 0.005) { candidateBest = candidate; addition = { ...w }; }
+        if (!candidate.pvHoldViolation && candidate.cost < candidateBest.cost - 0.005) { candidateBest = candidate; addition = { ...w }; }
       }
     }
     if (!addition) break;

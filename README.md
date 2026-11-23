@@ -1,6 +1,6 @@
 # Home Assistant Energy Planner
 
-Lokaler Empfehlungsplaner für PV, Hausbatterie und Elektroauto. **Version 0.5.0** läuft als Home-Assistant-App oder über die Kommandozeile. Node.js >=22, ausschließlich Standardbibliothek. Der Planer schaltet keine Geräte und setzt keine Wechselrichter-Timer; die Umsetzung bleibt manuell.
+Lokaler Empfehlungsplaner für PV, Hausbatterie und Elektroauto. **Version 0.5.1** läuft als Home-Assistant-App oder über die Kommandozeile. Node.js >=22, ausschließlich Standardbibliothek. Der Planer schaltet keine Geräte und setzt keine Wechselrichter-Timer; die Umsetzung bleibt manuell.
 
 ## Funktionsumfang
 

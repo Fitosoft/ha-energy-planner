@@ -42,7 +42,7 @@ keine Nullwerte für fehlende Daten. Der HA-Raw-Sensor wird zum Vergleich dokume
 - In Eigenverbrauchsmodus wird gespeicherte Energie zur Lastdeckung eingesetzt.
 - Im Zwangslademodus wird nicht entladen, auch nach Ziel-SOC. PV deckt im Modell
   zuerst die Last; diese Annahme ist am konkreten Wechselrichter noch zu bestätigen.
-- PV-Überschuss darf die Batterie auch über den Zwangslade-Zielwert hinaus laden.
+- Nach Zielerreichung wird PV-Überschuss bis Fensterende eingespeist; die Batterie lädt und entlädt nicht.
 - Höchstens zwei Fenster insgesamt pro Planlauf über den gesamten Planungshorizont; kein einzelnes Fenster überschreitet Mitternacht.
 - Die Suche je PV-Fall fügt kostenverbessernde Fenster hinzu, Ziel-SOC in 10%-Schritten.
   `price_risk` bewertet danach diese Zeitfenster mit variierten Zielwerten und Weglassen einzelner Fenster sowie keine Zwangsladung über alle PV-Fälle.

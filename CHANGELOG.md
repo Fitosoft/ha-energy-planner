@@ -1,3 +1,9 @@
+# 0.5.1
+
+- Herstellerbestätigte Lade- und Entladesperre nach Zielerreichung modelliert.
+- Lange PV-Haltefenster nach einer konservativen Ladezeitreserve ausgeschlossen, Nachtfenster erhalten.
+- PV-Exportsignal im minütlichen Archiv; keine automatische Steuerung.
+
 # 0.5.0
 
 - Zeitlich begrenzte Zusatzlasten separat planen und archivieren.

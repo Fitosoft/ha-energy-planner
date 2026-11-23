@@ -13,7 +13,7 @@ import { archiveRun, atomicJson, json, mergeStatistics, validateArchive } from '
 import { learnProfiles } from './learning.mjs';
 import { localParts, midnight, label } from './time.mjs';
 
-export const VERSION = '0.5.0';
+export const VERSION = '0.5.1';
 export const DEFAULT_NOTIFICATIONS = {
   mobile: 'mobile_app_toms_iphone',
   alexa: ['notify.echo_badezimmer_durchsagen','notify.thomas_echo_show_8_durchsagen','notify.echo_schlafzimmer_durchsagen',
@@ -123,7 +123,7 @@ export async function startService(directory = '/data', { port = 8099, host = '0
   }
   async function capture(config, now) {
     const ids = new Set([...Object.values(ACTUAL_ENTITIES), ...Object.values(config.entities).filter(Boolean),
-      'binary_sensor.zoe_ladestatus','sensor.zoe_ladezustand','device_tracker.zoe_standort']);
+      'binary_sensor.sungrow_pv_exporting','binary_sensor.zoe_ladestatus','sensor.zoe_ladezustand','device_tracker.zoe_standort']);
     const liveSoc=await reportedState(config.entities.batterySoc);
     const states = (await haRequest('states')).filter(s=>ids.has(s.entity_id)).map(s=>s.entity_id===liveSoc.entity_id?liveSoc:s).map(s=>({ entity_id:s.entity_id,state:s.state,last_updated:s.last_updated,last_changed:s.last_changed,last_reported:s.last_reported,
       unit:s.attributes.unit_of_measurement, attributes:s.entity_id===config.entities.forecastSolar?s.attributes:undefined }));

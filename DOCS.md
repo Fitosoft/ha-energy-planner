@@ -90,3 +90,5 @@ Die Fenstertabelle trennt den eingestellten Zielwert vom erwarteten SOC am Ende 
 Die Zusatzenergie wird minutengenau auf die Viertelstunden verteilt und separat in JSON, CSV und Berichten ausgewiesen. Zum Beenden das tatsächliche Ende setzen und den Eintrag behalten, nicht löschen: Jede auch nur teilweise betroffene historische Stunde wird vom Profil-Lernen ausgeschlossen, auch nach dem Abbau. So wird eine unsichere Schätzung weder vom Messwert abgezogen noch dauerhaft in die Grundlast übernommen. Bei zu wenigen geeigneten Stunden bleibt das frühere Profil erhalten. Diese Regel gilt für automatische und CLI-Profilberechnungen; Profilarchive speichern die Ausschlusskonfiguration und Anzahl ausgeschlossener geeigneter Stunden.
 
 Bei nachträglich erfassten Lasten ein bereits belastetes gelerntes Profil zuerst durch einen unbelasteten Stand ersetzen bzw. aus unbelasteten Daten neu erstellen. Der Ausschluss bereinigt keine bereits kontaminierten Rückfallwerte automatisch. Aktive Zusatzlasten enden nicht nach einer geratenen Dauer.
+
+Sungrow-Zielerreichung: [PV-Ladesperre und Fensterreserve](docs/sungrow-forced-charge.md).

@@ -22,3 +22,5 @@ Priorität: PV- und Hausverbrauchsprognose, danach Batterie-Energiebilanz/Verlus
 Andere Modellgrenzen bleiben davon getrennt: heuristische Fenstersuche und 10-%-SOC-Raster, fehlender Wert der gespeicherten Energie nach Horizontende sowie die Abhängigkeit von ausdrücklicher Planbestätigung und einer separat gemeldeten manuellen Umsetzung. Das sind keine durch einen einzelnen Korrekturfaktor lösbaren Kalibrierfragen.
 
 SBR160-Referenz: 320 V Nennspannung × 50 Ah = 16 kWh. Die 9,6 kW im Datenblatt sind DC-Nennleistung; bei 30 A ist die tatsächliche DC-Leistung spannungsabhängig. Quelle: [Sungrow-Datenblatt](https://info-support.sungrowpower.com/application/pdf/2022/04/21/DS_20220421_SBR096_128_160_192_224_256_Datasheet_V13_EN.pdf). Gesamtzähler aus einer App dürfen erst nach Klärung ihrer Messgrenzen als Wirkungsgradnachweis verwendet werden.
+
+Sungrow-Zielerreichung: [PV-Ladesperre und Fensterreserve](sungrow-forced-charge.md).

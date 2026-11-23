@@ -40,9 +40,10 @@ test('forced window supplies house from grid after reaching target', () => {
   assert.equal(p.importKwh, 1); assert.equal(p.finalSoc, 50); assert.equal(p.dischargedKwh, 0);
   assert.equal(simulate([slot(0)], b, 50).importKwh, 0);
 });
-test('PV surplus can still fill battery above forced target', () => {
+test('PV surplus is exported after forced target; normal charging resumes after window', () => {
   const p = simulate([slot(0, 0, 1)], b, 50, [{ start: 0, end: STEP, targetSoc: 40 }]);
-  assert.ok(p.finalSoc > 50); assert.equal(p.importKwh, 0);
+  assert.equal(p.finalSoc,50); assert.equal(p.importKwh,0); assert.equal(p.exportKwh,1);
+  assert.ok(simulate([slot(0,0,1)],b,50).finalSoc>50);
 });
 test('storage bounds, power limits and energy balance', () => {
   const a = Array.from({ length: 24 }, (_, i) => slot(i * STEP, i < 12 ? 0 : 2, i < 12 ? 3 : 0));
@@ -180,3 +181,5 @@ test('report distinguishes discharge blocking from actual battery charging', asy
   const q={...simulate([slot(0)],b,0,windows,0,true),windows};
   assert.match(windowExplanation(q),/Batterieladung.*AC-seitig/);
 });
+
+test('long nighttime holds remain allowed, daylight holds after reserve are rejected',()=>{const a=Array.from({length:12},(_,i)=>slot(i*STEP,0,0));const w=[{start:0,end:12*STEP,targetSoc:10}];assert.equal(simulate(a,b,50,w).pvHoldViolation,false);a[10].pvKwh=.1;assert.equal(simulate(a,b,50,w).pvHoldViolation,true);});

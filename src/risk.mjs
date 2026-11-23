@@ -14,11 +14,12 @@ export function recommendRisk(cases, config, initialSoc) {
       if(!unique.has(key))unique.set(key,{source:c.name,windows});
     }
   }
-  const candidates=[...unique.values()];
+  let candidates=[...unique.values()];
   for(const p of candidates){
     if(!validWindows(reference.slots,p.windows,config.battery))throw Error('Ungültige Gerätefenster im Preisvergleich');
     p.outcomes=cases.map(c=>({name:c.name,...simulate(c.slots,config.battery,initialSoc,p.windows,config.exportEurPerKwh)}));
   }
+  candidates=candidates.filter(p=>p.outcomes.every(o=>!o.pvHoldViolation));
   const best=cases.map((c,i)=>Math.min(...candidates.map(p=>p.outcomes[i].cost)));
   for(const p of candidates)p.maxExtraCost=Math.max(...p.outcomes.map((o,i)=>o.cost-best[i]));
   const referenceIndex=cases.indexOf(reference);
